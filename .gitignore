@@ -1,4 +1,4 @@
 www/*
-config/nginx/sites-available/*
-config/nginx/sites-enabled/*
+config/nginx/sites-available/*.conf
+config/nginx/sites-enabled/*.conf
 docker/volumes/*
