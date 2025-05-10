@@ -1,3 +1,4 @@
+.env
 www/*
 config/nginx/sites-available/*.conf
 config/nginx/sites-enabled/*.conf
