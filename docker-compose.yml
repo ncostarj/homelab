@@ -1,7 +1,7 @@
 services:
   homelabweb:
     image: nginx:latest
-    hostname: homelabweb
+    hostname: homelabweb.local
     container_name: homelabweb
     working_dir: /var/www
     extra_hosts:
@@ -9,7 +9,7 @@ services:
       - "projeto1.localhost=::1"
       - "projeto2.localhost=::1"
     ports:
-      - ${HOMELAB_WEB_PORT}:80
+      - ${HOMELAB_WEB_NGINX_PORT}:80
     volumes:
       - ./www:/var/www
       - ./config/nginx/sites-available:/etc/nginx/sites-available
@@ -22,15 +22,17 @@ services:
     image: mysql:latest
     hostname: homelabrds
     container_name: homelabrds
+    extra_hosts:
+      - "rds.homelab=::1"
     ports:
-     - ${HOMELAB_RDS_PORT}:3306  
+     - ${HOMELAB_RDS_MYSQL_PORT}:3306  
     volumes:
       - ./docker/volumes/mysqldata:/var/lib/mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=${HOMELAB_RDS_ROOT_PASSWORD}
-      - MYSQL_DATABASE=${HOMELAB_RDS_DATABASE}
-      - MYSQL_USER=${HOMELAB_RDS_USER}
-      - MYSQL_PASSWORD=${HOMELAB_RDS_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${HOMELAB_RDS_MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${HOMELAB_RDS_MYSQL_DATABASE}
+      - MYSQL_USER=${HOMELAB_RDS_MYSQL_USER}
+      - MYSQL_PASSWORD=${HOMELAB_RDS_MYSQL_PASSWORD}
     restart: unless-stopped
     networks:
       lan:
