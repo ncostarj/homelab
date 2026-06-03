@@ -1,7 +1,11 @@
 apps/*
+!apps/.gitkeep
 old
 .vscode
 .env
-infra/nginx/conf.d/*.conf
-infra/nginx/enabled/*.conf
+infra/nginx/conf.d/*
+!infra/nginx/conf.d/.gitkeep
+infra/nginx/enabled/*
+!infra/nginx/enabled/.gitkeep
 shared/volumes/*
+!shared/volumes/.gitkeep
