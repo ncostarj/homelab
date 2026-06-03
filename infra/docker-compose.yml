@@ -1,0 +1,23 @@
+services:
+  mysql:
+    image: mysql:8
+    container_name: infra_mysql
+    ports:
+      - ${RDS_SERVER_PORT}:3306    
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${RDS_SERVER_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${RDS_SERVER_DATABASE}
+      - MYSQL_USER=${RDS_SERVER_USER}
+      - MYSQL_PASSWORD=${RDS_SERVER_PASSWORD}
+    volumes:
+      - ../shared/volumes/mysql/data:/var/lib/mysql
+    networks:
+      - internal
+
+# other common services
+
+networks:
+  internal:
+    name: internal
+    driver: bridge

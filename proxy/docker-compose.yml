@@ -1,0 +1,16 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: proxy_nginx
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ../infra/nginx/conf.d:/etc/nginx/conf.d
+    networks:
+      - proxy
+    restart: unless-stopped
+networks:
+  proxy:
+    name: proxy
+    driver: bridge
