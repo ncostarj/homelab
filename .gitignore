@@ -3,6 +3,8 @@ apps/*
 old
 .vscode
 .env
+infra/mysql/dumps/*
+!infra/mysql/dumps/.gitkeep
 infra/nginx/conf.d/*
 !infra/nginx/conf.d/.gitkeep
 infra/nginx/enabled/*

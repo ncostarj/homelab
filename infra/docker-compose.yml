@@ -12,6 +12,7 @@ services:
       - MYSQL_PASSWORD=${RDS_SERVER_PASSWORD}
     volumes:
       - ../shared/volumes/mysql/data:/var/lib/mysql
+      - ./mysql/dumps:/var/www/dumps
     networks:
       - internal
 
