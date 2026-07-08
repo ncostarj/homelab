@@ -1,0 +1,22 @@
+services:
+  pihole:
+    container_name: dsn
+    image: pihole/pihole:latest
+    restart: unless-stopped
+    ports:
+      - ${DNS_SERVER_PORT}:53/tcp
+      - ${DNS_SERVER_PORT}:53/udp
+    environment:
+      TZ: ${DNS_TIMEZONE}
+      WEBPASSWORD: ${DNS_WEB_PASSWORD}
+      DNSMASQ_LISTENING: "all"
+    volumes:
+      - ./data/etc-pihole:/etc/pihole
+      - ./data/etc-dnsmasq.d:/etc/dnsmasq.d
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - proxy
+networks:
+  proxy:
+    external: true

@@ -1,0 +1,313 @@
+{
+  "name": "Fluxo lembrete de tarefas",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.todoist.com/api/v1/tasks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -48,
+        -208
+      ],
+      "id": "fe31ff52-5473-48bd-a136-4dd880dc59d1",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "cAEoPCfTGuvlEmIA",
+          "name": "Todoist Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "results",
+        "include": "=noOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        176,
+        -208
+      ],
+      "id": "24ac6ff5-cc2a-49a6-a795-075687bdf22d",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1d41a76b-ab33-4cba-89c8-72e68aa2d45f",
+              "name": "vencimento",
+              "value": "={{ $json.due.date.replace(/([0-9]{4})-([0-9]{2})-([0-9]{2})/,'$3/$2/$1') }}",
+              "type": "string"
+            },
+            {
+              "id": "0f019c70-cf57-4156-afbf-13c82782860f",
+              "name": "titulo",
+              "value": "={{ $json.content }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        848,
+        -208
+      ],
+      "id": "85681a83-cd85-4e5d-8c80-c8ae757f13ae",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "={{ $json.parse_mode }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1296,
+        -208
+      ],
+      "id": "9bca99c0-ece1-4ede-be07-cb61e8703d87",
+      "name": "Send a text message",
+      "webhookId": "349920e9-e447-48e6-83df-614f9e86d1ae",
+      "credentials": {
+        "telegramApi": {
+          "id": "6wdFlzjl0nu1aQtp",
+          "name": "Telegram Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  chat_id: \"-1003549149993\",\n  text: $input.all().map(item => `<b>${item.json.vencimento} - ${item.json.titulo}</b>`).join('\\n'),\n  parse_mode:\"HTML\"\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        -208
+      ],
+      "id": "b68f6447-438a-4d59-92fc-8823db845afd",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        -208
+      ],
+      "id": "0ac94340-6866-41ad-903d-163c034b23b8",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1537ad52-6b8b-4fbe-84db-52515bc693f3",
+              "leftValue": "={{ $json.due }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        400,
+        -208
+      ],
+      "id": "6bc2c4e9-9284-4407-a204-964cdc82fc33",
+      "name": "Tem data de vencimento?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c5e6be3d-a62a-42e4-8818-1ae62390a016",
+              "leftValue": "={{ $json.due.date }}",
+              "rightValue": "={{ $now }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "beforeOrEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        624,
+        -208
+      ],
+      "id": "390ddf86-7ee0-4ade-846a-dc94d571902f",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "-1003549149993",
+        "text": "Hooray! Sem nada para o período!",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -272,
+        16
+      ],
+      "id": "0dbe3bae-54e2-44e1-a56f-bcdb555519f8",
+      "name": "Send a text message1",
+      "webhookId": "1adfb71e-89d6-4513-8d8b-9b67c7d8d0bb",
+      "credentials": {
+        "telegramApi": {
+          "id": "6wdFlzjl0nu1aQtp",
+          "name": "Telegram Credential"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Tem data de vencimento?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem data de vencimento?": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "875a4441-0d4f-47e8-9362-eb6fe90a9232",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "273f21427c4f0544a59c09048a37a93bb10f921c1c07614b1549755387c75e47"
+  },
+  "id": "Ypxq_CrMwEuzu-ZJJ8P6A",
+  "tags": []
+}

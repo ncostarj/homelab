@@ -1,4 +1,7 @@
 apps/*
+data
+sites-available/*
+sites-enabled/*
 !apps/.gitkeep
 old
 .vscode

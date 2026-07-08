@@ -1,7 +1,7 @@
 services:
   mysql:
     image: mysql:8
-    container_name: infra_mysql
+    container_name: rds
     ports:
       - ${RDS_SERVER_PORT}:3306    
     restart: unless-stopped
@@ -11,8 +11,8 @@ services:
       - MYSQL_USER=${RDS_SERVER_USER}
       - MYSQL_PASSWORD=${RDS_SERVER_PASSWORD}
     volumes:
-      - ../shared/volumes/mysql/data:/var/lib/mysql
-      - ./mysql/dumps:/var/www/dumps
+      - ./data:/var/lib/mysql
+      - ./backups:/var/www/backups
     networks:
       - internal
 
