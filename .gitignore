@@ -1,5 +1,6 @@
 apps/*
-data
+**/data/*
+!**/data/.gitkeep
 sites-available/*
 sites-enabled/*
 !apps/.gitkeep
