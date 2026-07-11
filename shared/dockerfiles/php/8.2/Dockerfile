@@ -38,9 +38,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
 # Ajustar permissões de usuário
 RUN usermod -u 1000 www-data && groupmod -g 1000 www-data
 
-USER www-data
-
 # Test versions
 RUN composer --version && node --version && yarn --version
+
+USER www-data
 
 CMD ["php-fpm"]
