@@ -1,8 +1,21 @@
 FROM php:8.2-fpm
 
-WORKDIR /var/www/html/jobcon-web
+# UID/GID do usuário do host (podem ser sobrescritos na build)
+ARG UID=1000
+ARG GID=1000
+ARG USER=developer
 
-# Install base dependencies
+# Usuário padrão
+RUN groupadd -g ${GID} ${USER} \
+    && useradd -m -u ${UID} -g ${GID} -s /bin/bash ${USER}
+
+# Home do usuário
+ENV HOME=/home/${USER}
+
+# Workspace genérico para qualquer projeto
+WORKDIR ${HOME}/workspace
+
+# Dependências do sistema
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -17,30 +30,41 @@ RUN apt-get update && apt-get install -y \
     libonig-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# PHP Extensions
+# Extensões PHP
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
     docker-php-ext-install -j$(nproc) \
-        bcmath gd intl mbstring opcache pdo_mysql xml zip
+        bcmath \
+        gd \
+        intl \
+        mbstring \
+        opcache \
+        pdo_mysql \
+        xml \
+        zip
 
-# MongoDB PHP driver
-RUN pecl install mongodb-1.21.1 && \
-    echo "extension=mongodb.so" > $PHP_INI_DIR/conf.d/mongodb.ini
+# MongoDB
+RUN pecl install mongodb-1.21.1 \
+    && docker-php-ext-enable mongodb
 
-# Composer (latest stable)
-RUN curl -sS https://getcomposer.org/installer | php -- \
-    --install-dir=/usr/local/bin --filename=composer
+# Composer
+COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
-# Node.js 24.x (LTS) + package managers
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g npm@latest yarn pnpm @vitejs/plugin-vue @vitejs/plugin-vue-jsx --save-dev 
+# Node.js 24.x
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g npm@latest yarn pnpm
 
-# Ajustar permissões de usuário
-RUN usermod -u 1000 www-data && groupmod -g 1000 www-data
+# Garantir que o usuário seja dono da sua HOME
+RUN chown -R ${USER}:${USER} ${HOME}
 
-# Test versions
-RUN composer --version && node --version && yarn --version
+# Testes
+RUN php -v \
+    && composer --version \
+    && node --version \
+    && npm --version \
+    && yarn --version \
+    && pnpm --version
 
-USER www-data
+USER ${USER}
 
 CMD ["php-fpm"]
