@@ -1,0 +1,43 @@
+#!/bin/bash
+# Arquivo: comandos/ft-infra
+
+SUBCOMANDO="$1"
+shift
+
+help() {
+    echo "Uso: ft infra [comando]"
+    echo ""
+    echo "Comandos:"
+    echo "artisan  Executa o artisan"
+    echo "composer Executa o composer"
+    echo "php      Executa o php"
+    exit 1
+}
+
+case "$SUBCOMANDO" in
+    artisan)
+        docker compose exec $(basename "$(pwd)")-php php artisan "$@"
+        ;;
+    composer)
+        docker compose exec $(basename "$(pwd)")-php composer "$@"
+        ;;
+    mysql)
+        docker exec -it rds mysql "$@"
+        ;;
+    nrd)
+        if [[ -f "$(pwd)/src/package.json" ]]; then
+            npm run dev --prefix ./src
+        else
+            npm run dev
+        fi
+        ;;
+    php)
+        docker compose exec $(basename "$(pwd)")-php php "$@"
+        ;;
+    tinker)
+        docker compose exec $(basename "$(pwd)")-php php artisan tinker "$@"
+        ;;
+    *)
+        help
+        ;;
+esac

@@ -1,0 +1,263 @@
+#!/bin/bash
+# Arquivo: comandos/ft-projeto
+
+set -e
+
+# Cores
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# SCRIPT_DIR="$(basename $(pwd))"
+BASE_DIR="/home/$(whoami)/Projetos/fintools"
+APPS_DIR="${BASE_DIR}/apps"
+INFRA_DIR="${BASE_DIR}/infra"
+TEMPLATES_DIR="${BASE_DIR}/shared/templates"
+NGINX_ENABLED_DIR="${INFRA_DIR}/proxy/nginx/conf.d/enabled"
+NGINX_AVAILABLE_DIR="${INFRA_DIR}/proxy/nginx/conf.d/available"
+
+SUBCOMANDO="$1"
+shift
+
+help() {
+    echo "Uso: ft ia [comando]"
+    echo ""
+    echo "Comandos:"
+    echo "-c, --create-project    Executa o comando ollama"
+    echo "-e, --enable-project    Listas os models do ollama"
+    echo "-d, --disable-project   Acessa o container do ollama"
+    exit 1
+}
+
+iniciar_projeto() {
+    echo ""
+    echo -e "${CYAN}+------------------------------------------+${NC}"
+    echo -e "${CYAN}|   🚀  Novo Projeto                       |${NC}"
+    echo -e "${CYAN}+------------------------------------------+${NC}"
+    echo ""
+
+    # Passo 1: Nome do projeto
+    echo -e "${YELLOW}📝 Passo 1: Nome do projeto${NC}"
+    read -p "   Digite o nome do projeto: " NOME_PROJETO
+
+    if [ -z "$NOME_PROJETO" ]; then
+        echo -e "${RED}❌ Nome do projeto não pode ser vazio.${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}   ✅ Projeto: $NOME_PROJETO${NC}"
+    echo ""
+
+    # Passo 2: Tecnologia
+    echo -e "${YELLOW}🛠️  Passo 2: Tecnologia${NC}"
+    echo "   Selecione a tecnologia:"
+    echo "   1) Front Vue"
+    echo "   2) Front Nuxt (Vue)"
+    echo "   3) Back PHP"
+    echo "   4) Back Laravel (PHP)"
+    echo "   5) Back Nodejs"
+    echo "   6) Back Express (Nodejs)"
+    echo ""
+    read -p "   Opção [1-6]: " TECH_OPTION
+
+    TECH=""
+
+    case $TECH_OPTION in
+        1)
+            TECH='node'
+            TECNOLOGIA="Front Vue"
+            ;;
+        2)
+            TECH='node'
+            TECNOLOGIA="Front Nuxt (Vue)"
+            ;;
+        3)
+            TECH='php'
+            TECNOLOGIA="Back PHP"
+            ;;
+        4)
+            TECH='php'
+            TECNOLOGIA="Back Laravel (PHP)"
+            ;;
+        5)
+            TECH='node'
+            TECNOLOGIA="Back Nodejs"
+            ;;
+        6)
+            TECH='node'
+            TECNOLOGIA="Back Express (Nodejs)"
+            ;;
+        *)
+            echo -e "${RED}❌ Opção inválida.${NC}"
+            exit 1
+            ;;
+    esac
+
+    echo -e "${GREEN}   ✅ Tecnologia: $TECNOLOGIA${NC}"
+    echo ""
+
+    if [ -z "$TECH" ]; then
+        echo -e "${RED}❌ Nome do projeto não pode ser vazio.${NC}"
+        exit 1
+    fi
+
+    echo -e "${YELLOW} Projeto ${TECH} ${NC}"
+    read -p "   Qual é a versão do ${TECH}: " VERSAO
+
+    if [ -z "$VERSAO" ]; then
+        echo -e "${RED}❌ Nome do projeto não pode ser vazio.${NC}"
+        exit 1
+    fi
+    echo ""
+
+    # Passo 3: Origem do projeto
+    echo -e "${YELLOW}📦 Passo 3: Origem do projeto${NC}"
+    read -p "   O projeto está versionado? (s/n): " VERSIONADO
+
+    PROJECT_DIR="$APPS_DIR/$NOME_PROJETO"
+
+    # Verificando se está versionado ou não
+    if [ "$VERSIONADO" = "s" ] || [ "$VERSIONADO" = "S" ]; then
+        echo -e "${RED} Atenção utilize somente a url de ssh. Ex git@gitlab:projeto.git${NC}"
+        read -p "   URL do repositório git: " GIT_URL
+
+        if [ -z "$GIT_URL" ]; then
+            echo -e "${RED}❌ URL do repositório não pode ser vazia.${NC}"
+            exit 1
+        elif [[ "$GIT_URL" == *http* ]]; then
+            echo -e "${RED}❌ Utilize a url de ssh"
+            exit 1
+        fi
+
+        echo -e "   ⏳ Clonando repositório..."
+        git clone "$GIT_URL" "$PROJECT_DIR"
+        echo -e "${GREEN}   ✅ Repositório clonado em $PROJECT_DIR${NC}"
+    else
+        read -p "   Caminho da pasta do projeto: " PASTA_ORIGEM
+
+        if [ ! -d "$PASTA_ORIGEM" ]; then
+            echo -e "${RED}❌ Pasta não encontrada: $PASTA_ORIGEM${NC}"
+            exit 1
+        fi
+
+        echo -e "   ⏳ Movendo projeto..."
+        mkdir -p "$PROJECT_DIR"
+        cp -r "$PASTA_ORIGEM"/. "$PROJECT_DIR/"
+        echo -e "${GREEN}   ✅ Projeto movido para $PROJECT_DIR${NC}"
+    fi
+    echo ""
+
+    # Verificando se tem ou não a pasta src
+    if [ -d "$PROJECT_DIR/src" ]; then
+        echo -e "${GREEN}   ✅ Pasta src já existe${NC}"
+    else
+        echo -e "   ⏳ Organizando projeto em src/..."
+        mkdir -p "$PROJECT_DIR/__tmp_src"
+        find "$PROJECT_DIR" -maxdepth 1 ! -name "__tmp_src" ! -path "$PROJECT_DIR" -exec mv {} "$PROJECT_DIR/__tmp_src/" \;
+        mv "$PROJECT_DIR/__tmp_src" "$PROJECT_DIR/src"
+        echo -e "${GREEN}   ✅ Conteúdo movido para $PROJECT_DIR/src${NC}"
+    fi
+    echo ""
+
+    echo "config/*" >> "$PROJECT_DIR/src/.gitignore"
+    echo "docker-compose.override.yml" >> "$PROJECT_DIR/src/.gitignore"
+
+    # Criar pastas config/conf.d
+    echo -e "${YELLOW}📁 Passo 4: Criando estrutura de configuração${NC}"
+    mkdir -p "$PROJECT_DIR/config/conf.d"
+    echo -e "${GREEN}   ✅ Pasta config/conf.d criada${NC}"
+    echo ""
+
+    # Gerar arquivo Nginx local do projeto
+    echo -e "${YELLOW}⚙️  Passo 5: Gerando configuração Nginx do projeto${NC}"
+    sed "s/padrao/$NOME_PROJETO/g" "$TEMPLATES_DIR/padrao.conf" > "$PROJECT_DIR/config/conf.d/$NOME_PROJETO.conf"
+    echo -e "${GREEN}   ✅ Arquivo $NOME_PROJETO.conf criado em config/conf.d${NC}"
+    echo ""
+
+    # Gerar docker-compose.yml
+    echo -e "${YELLOW}🐳 Passo 6: Gerando docker-compose.yml${NC}"
+
+    EXISTING_COMPOSE=""
+
+    if [ -f "$PROJECT_DIR/docker-compose.yml" ] || [ -f "$PROJECT_DIR/docker-compose.yaml" ]; then
+        EXISTING_COMPOSE="$PROJECT_DIR"
+    elif [ -f "$PROJECT_DIR/src/docker-compose.yml" ] || [ -f "$PROJECT_DIR/src/docker-compose.yaml" ]; then
+        EXISTING_COMPOSE="$PROJECT_DIR/src"
+    fi
+
+    if [ -n "$EXISTING_COMPOSE" ]; then
+        echo -e "${YELLOW}   ⚠️  docker-compose já encontrado em: $EXISTING_COMPOSE${NC}"
+        sed "s/padrao/$NOME_PROJETO/g" "$TEMPLATES_DIR/docker-compose-padrao.yml" > "$PROJECT_DIR/docker-compose.override.yml"
+        echo -e "${GREEN}   ✅ docker-compose.override.yml criado (compose existente mantido)${NC}"
+    else
+        sed "s/padrao/$NOME_PROJETO/g" "$TEMPLATES_DIR/docker-compose-padrao.yml" > "$PROJECT_DIR/docker-compose.yml"
+        echo -e "${GREEN}   ✅ docker-compose.yml criado${NC}"
+    fi
+    echo ""
+
+    if [ "$TECH_OPTION" == 3 ] || [ "$TECH_OPTION" == 4 ]; then
+        VERSAO="${VERSAO}-fpm"
+    fi
+
+    sed -i "s/TECH/$TECH/g" "$PROJECT_DIR/docker-compose.yml"
+    sed -i "s/VERSAO/$VERSAO/g" "$PROJECT_DIR/docker-compose.yml"
+
+    # Adicionar conf no proxy global (Nginx)
+    echo -e "${YELLOW}🌐 Passo 7: Adicionando configuração ao proxy global${NC}"
+    mkdir -p "$NGINX_ENABLED_DIR"
+    sed "s/padrao/$NOME_PROJETO/g" "$TEMPLATES_DIR/global.conf" > "$NGINX_ENABLED_DIR/$NOME_PROJETO.conf"
+    echo -e "${GREEN}   ✅ $NOME_PROJETO.conf adicionado em infra/proxy/nginx/conf.d/enabled${NC}"
+    echo ""
+
+    echo -e "${YELLOW}🔄 Passo 8: Verificando proxy...${NC}"
+    if docker ps --format '{{.Names}}' | grep -q "ws"; then
+        echo -e "   ⏳ Reiniciando proxy..."
+        docker compose -f "$INFRA_DIR/docker-compose.yml" restart nginx-proxy 2> /dev/null \
+            || echo -e "${YELLOW}   ⚠️  Não foi possível reiniciar o proxy automaticamente.${NC}"
+        echo -e "${GREEN}   ✅ Proxy reiniciado${NC}"
+    else
+        echo -e "${YELLOW}   ⚠️  Nenhum container proxy encontrado rodando.${NC}"
+    fi
+
+    echo ""
+
+    # Finalização
+    echo -e "${CYAN}+------------------------------------------+${NC}"
+    echo -e "${CYAN}|   🎉 Projeto configurado com sucesso!    |${NC}"
+    echo -e "${CYAN}+------------------------------------------+${NC}"
+    echo ""
+    echo -e "${GREEN}📋 Resumo:${NC}"
+    echo -e "   Projeto:     $NOME_PROJETO"
+    echo -e "   Tecnologia:  $TECNOLOGIA"
+    echo -e "   Local:       $PROJECT_DIR"
+    echo ""
+    echo -e "${CYAN}▶ Para levantar o container, execute:${NC}"
+    echo ""
+    echo -e "   cd $PROJECT_DIR && docker compose up -d"
+    echo ""
+}
+
+habilitar_projeto() {
+    echo "ep"
+}
+
+desabilitar_projeto() {
+    echo "dp"
+}
+
+case "$SUBCOMANDO" in
+    -c | --create-project)
+        iniciar_projeto
+        ;;
+    -e | --enable-project)
+        habilitar_projeto
+        ;;
+    -d | --disable-project)
+        desabilitar_projeto
+        ;;
+    *)
+        help
+        ;;
+esac

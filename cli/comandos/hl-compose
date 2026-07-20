@@ -1,0 +1,55 @@
+#!/bin/bash
+# Arquivo: comandos/ft-compose
+
+SUBCOMANDO="$1"
+shift
+
+# Função para tratar override do Compose
+drc() {
+    if [[ -f "$(pwd)/docker-compose.override.yml" ]]; then
+        docker compose -f docker-compose.override.yml "$@"
+    else
+        docker compose "$@"
+    fi
+}
+
+help() {
+    echo "Uso: ft compose [comando]"
+    echo ""
+    echo "Comandos:"
+    echo "  -u, --up             Inicia o(s) container(s)"
+    echo "  -ud, --up-detached   Inicia o(s) container(s) em segundo plano"
+    echo "  -e, --exec         Acessa um container ou executa algum comando dentro de um container"
+    echo "  -d, --down           Desliga o(s) container(s)"
+    echo "  -l, --logs           Mostra os logs do(s) container(s)"
+    echo "  -ps, --ps            Mostra as informações dos containers que estão rodando"
+    echo "  -r, --restart        Reinicia o(s) containers"
+    exit 1    
+}
+
+case "$SUBCOMANDO" in
+    -u|--up)
+        drc up "$@"
+        ;;
+    -ud|--up-detached)
+        drc up -d "$@"
+        ;;
+    -e|--exec)
+        drc exec "$@"
+        ;;
+    -d|--down)
+        drc down "$@"
+        ;;
+    -l|--logs)
+        drc logs "$@"
+        ;;
+    -ps|--ps)
+        drc ps "$@"
+        ;;
+    -r|--restart)
+        drc restart "$@"
+        ;;
+    *)
+        help
+        ;;
+esac
