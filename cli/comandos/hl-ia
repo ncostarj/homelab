@@ -1,0 +1,30 @@
+#!/bin/bash
+# Arquivo: comandos/ft-ia
+
+SUBCOMANDO="$1"
+shift
+
+help() {
+    echo "Uso: ft ia [comando]"
+    echo ""
+    echo "Comandos:"
+    echo "ollama        Executa o comando ollama"
+    echo "models        Listas os models do ollama"
+    echo "-a, --access  Acessa o container do ollama"
+    exit 1
+}
+
+case "$SUBCOMANDO" in
+    ollama)
+        docker exec -it ollama ollama "$@"
+        ;;
+    models)
+        docker exec -it ollama ollama list
+        ;;
+    -a | --access)
+        docker exec -it ollama bash
+        ;;
+    *)
+        help
+        ;;
+esac

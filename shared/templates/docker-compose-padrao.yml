@@ -1,0 +1,35 @@
+services:
+  padrao-nginx:
+    image: nginx:alpine
+    hostname: padrao-nginx
+    container_name: padrao-nginx
+    restart: always
+    volumes:
+      - ./src:/var/www/html/padrao
+      - ./config/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - padrao-php
+    networks:
+      - fintools
+  padrao-php:
+    image: fintools/php:8.2
+    hostname: padrao-php
+    container_name: padrao-php
+    restart: always
+    build:
+      context: ../../infra/php/82
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    volumes:
+      - ./src:/var/www/html/padrao
+      - ~/.ssh:/home/fintools/.ssh:ro
+    working_dir: /var/www/html/padrao
+    networks:
+      - fintools
+      - internal 
+networks:
+  fintools:
+    external: true
+  internal:
+    external: true

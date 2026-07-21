@@ -1,0 +1,44 @@
+#!/bin/bash
+# Arquivo: comandos/ft-docker
+
+SUBCOMANDO="$1"
+shift
+
+help() {
+    echo "Uso: ft compose [comando]"
+    echo ""
+    echo "Comandos:"
+    echo "  -bx, --buildx     Cria uma imagem a partir de um dockerfile específico"
+    echo "  -c,  --container  Mostra informações sobre os containers em execução"
+    echo "  -e,  --exec       Acessa um container ou executa algum comando dentro de um container"
+    echo "  -i,  --image      Mostra informções sobre as imagens existentes"
+    echo "  -l,  --network    Mostra informações sobre as redes disponíveis"
+    echo "  -v,  --volume     Mostra informações dos volumes disponíveis"
+    exit 1    
+}
+
+case "$SUBCOMANDO" in
+    -bx|--buildx)
+        # Chama a função drc passando 'up' e qualquer outra flag que o usuário digitou (como -d)
+        docker buildx build "$@"
+        ;;
+    -c|--container) 
+        docker container "$@"
+        ;;
+    -e|--exec)
+        # Chama a função drc passando 'up' e qualquer outra flag que o usuário digitou (como -d)
+        docker exec "$@"
+        ;;
+    -i|--image) 
+        docker image "$@"
+        ;;
+    -n|--network) 
+        docker network "$@"
+        ;;
+    -v|--volume)
+        docker volume "$@"
+        ;;
+    *)
+        help
+        ;;
+esac
