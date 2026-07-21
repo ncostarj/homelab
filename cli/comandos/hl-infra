@@ -5,7 +5,7 @@ SUBCOMANDO="$1"
 shift
 
 help() {
-    echo "Uso: ft infra [comando]"
+    echo "Uso: hl infra [comando]"
     echo ""
     echo "Comandos:"
     echo "artisan  Executa o artisan"

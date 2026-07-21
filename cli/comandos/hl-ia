@@ -5,7 +5,7 @@ SUBCOMANDO="$1"
 shift
 
 help() {
-    echo "Uso: ft ia [comando]"
+    echo "Uso: hl ia [comando]"
     echo ""
     echo "Comandos:"
     echo "ollama        Executa o comando ollama"

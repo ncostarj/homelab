@@ -49,7 +49,7 @@ commit() {
     done
 
     # Limpa os argumentos processados
-    shift $((OPTIND - 1))
+    shihl $((OPTIND - 1))
 
     # Valida se os parâmetros obrigatórios foram passados
     if [ -z "$TIPO" ] || [ -z "$TEXTO" ]; then
@@ -65,7 +65,7 @@ commit() {
 }
 
 commit_help() {
-    echo "Uso: ft git -co [opcoes]"
+    echo "Uso: hl git -co [opcoes]"
     echo "💡 Opções: "
     echo "-f(feat)      Adiciona -feat na mensagem do commit"
     echo "-x(fix)       Adiciona -fix na mensagem do commit"
@@ -88,7 +88,7 @@ push() {
 }
 
 help() {
-    echo "Uso: ft compose [comando]"
+    echo "Uso: hl compose [comando]"
     echo ""
     echo "Comandos:"
     echo "-a, --add            Adiciona arquivos ao commit"

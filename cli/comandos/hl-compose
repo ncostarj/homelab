@@ -14,7 +14,7 @@ drc() {
 }
 
 help() {
-    echo "Uso: ft compose [comando]"
+    echo "Uso: hl compose [comando]"
     echo ""
     echo "Comandos:"
     echo "  -u, --up             Inicia o(s) container(s)"

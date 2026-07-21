@@ -5,7 +5,7 @@ SUBCOMANDO="$1"
 shift
 
 help() {
-    echo "Uso: ft compose [comando]"
+    echo "Uso: hl compose [comando]"
     echo ""
     echo "Comandos:"
     echo "  -bx, --buildx     Cria uma imagem a partir de um dockerfile específico"
