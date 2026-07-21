@@ -61,7 +61,7 @@ commit() {
 
     echo "📝 Criando commit: git commit -m ${MENSAGEM}"
 
-    git commit -m "$FORMATO_MENSAGEM"
+    git commit -m "$MENSAGEM"
 }
 
 commit_help() {
