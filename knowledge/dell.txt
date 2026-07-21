@@ -1,0 +1,17 @@
+System:
+  Kernel: 6.8.0-134-generic arch: x86_64 bits: 64
+  Desktop: Cinnamon v: 6.2.9 Distro: Linux Mint 22 Wilma
+Machine:
+  Type: Portable System: Dell product: Vostro 5470 v: N/A serial: <filter>
+  Mobo: Dell model: 0F7NWH v: A00 serial: <filter> UEFI: Dell v: A12
+    date: 11/05/2015
+CPU:
+  Info: dual core model: Intel Core i7-4510U bits: 64 type: MT MCP cache:
+    L2: 512 KiB
+  Speed (MHz): avg: 798 min/max: 800/3100 cores: 1: 798 2: 798 3: 798 4: 798
+Graphics:
+  Device-1: Intel Haswell-ULT Integrated Graphics driver: i915 v: kernel
+  Device-2: NVIDIA GK208M [GeForce GT 740M] driver: N/A
+Info:
+  Memory: total: 8 GiB available: 7.66 GiB used: 2.93 GiB (38.3%) igpu: 32 MiB
+  Processes: 348 Uptime: 6m Shell: Sudo inxi: 3.3.34

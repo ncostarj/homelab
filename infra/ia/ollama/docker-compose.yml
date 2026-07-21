@@ -1,0 +1,79 @@
+services:
+
+  ollama:
+    image: ollama/ollama:latest
+    platform: linux/arm64
+    container_name: ollama
+    init: true
+
+    restart: unless-stopped
+
+    environment:
+      OLLAMA_KEEP_ALIVE: 5m
+      OLLAMA_MAX_LOADED_MODELS: 1
+      OLLAMA_NUM_PARALLEL: 1
+      OLLAMA_NUM_THREAD: 6
+      OLLAMA_MAX_QUEUE: 2
+      OLLAMA_CONTEXT_LENGTH: 512    
+
+    volumes:
+      - ./data/ollama:/root/.ollama
+
+    networks:
+      - proxy
+
+    cpus: 5
+    shm_size: 1g
+
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+    security_opt:
+      - no-new-privileges:true
+
+  webui:
+    image: ghcr.io/open-webui/open-webui:main
+    platform: linux/arm64
+    container_name: open-webui
+
+    restart: unless-stopped
+
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      WEBUI_URL: http://ollama.web.home
+
+    volumes:
+      - ./data/webui:/app/backend/data
+
+    networks:
+      - proxy
+
+    mem_limit: 768m
+    cpus: 1
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  proxy:
+    external: true

@@ -1,0 +1,1 @@
+para arquitetura posso separar os datas por aplicação dentro de infra ou do jeito como está em shared/volumes todos juntos

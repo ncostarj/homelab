@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Descobre onde o script principal está instalado
+DIR_ATUAL="$(dirname "$(readlink -f "$0")")"
+PASTA_COMANDOS="$DIR_ATUAL/comandos"
+
+COMANDO="$1"
+shift
+
+# Se não passar comando ou pedir ajuda
+if [ -z "$COMANDO" ] || [ "$COMANDO" = "-h" ] || [ "$COMANDO" = "--help" ]; then
+    echo "Uso: hl <comando> [subcomando] [opções]"
+    echo "Comandos disponíveis:"
+    ls "$PASTA_COMANDOS" | sed 's/hl-//'
+    exit 0
+fi
+
+# Monta o nome do arquivo que deve existir
+ARQUIVO_COMANDO="$PASTA_COMANDOS/hl-$COMANDO"
+
+# Verifica se o subcomando existe e é executável
+if [ -x "$ARQUIVO_COMANDO" ]; then
+    # Executa o subcomando passando todos os parâmetros restantes ($@)
+    exec "$ARQUIVO_COMANDO" "$@"
+# Verifica se o arquivo existe, mas não é executável
+elif [ -f "$ARQUIVO_COMANDO" ]; then
+    echo "Erro: Comando '$COMANDO' encontrado, mas você não tem permissão de execução (+x)."
+    exit 1
+else
+    echo "Erro: Comando '$COMANDO' não encontrado."
+    exit 1
+fi

@@ -1,0 +1,133 @@
+#!/bin/bash
+# Arquivo: comandos/ft-git
+
+SUBCOMANDO="$1"
+shift
+
+commit() {
+
+    # Captura a branch atual
+    local BRANCH
+    BRANCH=$(git branch --show-current)
+
+    # Se não estiver em um repositório git, a branch estará vazia
+    if [ -z "$BRANCH" ]; then
+        echo "❌ Erro: Você não está em um repositório Git válido."
+        return 1
+    fi
+
+    # Inicializando as variaveis de tipo e texto
+    local TIPO=""
+    local TEXTO=""
+
+    # O ":" depois do m indica que a flag -m exige um argumento (ex: -m "texto")
+    while getopts ":fxrdsctpim:" opt; do
+        case ${opt} in
+            f) TIPO="feat" ;;
+            x) TIPO="fix" ;;
+            r) TIPO="refactor" ;;
+            d) TIPO="docs" ;;
+            s) TIPO="style" ;;
+            t) TIPO="test" ;;
+            c) TIPO="chore" ;;
+            p) TIPO="perf" ;;
+            i) TIPO="ci" ;;
+            m)
+                # $OPTARG vai conter o texto que foi passado após o -m
+                TEXTO="$OPTARG"
+                ;;
+            \?)
+                # Se usarem uma flag com "-" que não está na lista (ex: -z)
+                TIPO="-$OPTARG"
+                ;;
+            :)
+                # Caso o usuário passe -m mas esqueça de digitar a mensagem depois
+                echo "Erro: A opção -$OPTARG requer uma mensagem." >&2
+                return 1
+                ;;
+        esac
+    done
+
+    # Limpa os argumentos processados
+    shift $((OPTIND - 1))
+
+    # Valida se os parâmetros obrigatórios foram passados
+    if [ -z "$TIPO" ] || [ -z "$TEXTO" ]; then
+        commit_help
+        return 1
+    fi
+
+    local MENSAGEM="${BRANCH}-${TIPO}: ${TEXTO}"
+
+    echo "📝 Criando commit: git commit -m ${MENSAGEM}"
+
+    git commit -m "$MENSAGEM"
+}
+
+commit_help() {
+    echo "Uso: ft git -co [opcoes]"
+    echo "💡 Opções: "
+    echo "-f(feat)      Adiciona -feat na mensagem do commit"
+    echo "-x(fix)       Adiciona -fix na mensagem do commit"
+    echo "-r(refactor)  Adiciona -refactor na mensagem do commit"
+    echo "-d(docs)      Adiciona -docs na mensagem do commit"
+    echo "-s(style)     Adiciona -style na mensagem do commit"
+    echo "-t(test)      Adiciona -test na mensagem do commit"
+    echo "-c(chore)     Adiciona -chore na mensagem do commit"
+    echo "-p(perf)      Adiciona -perf na mensagem do commit"
+    echo "-i(ci)        Adiciona -ci na mensagem do commit"
+    echo "-m(message)   Adiciona -message na mensagem do commit"
+}
+
+push() {
+    if [ -z "$1" ]; then
+        git push origin "$(git branch --show-current)"
+    else
+        git push "$@"
+    fi
+}
+
+help() {
+    echo "Uso: ft compose [comando]"
+    echo ""
+    echo "Comandos:"
+    echo "-a, --add            Adiciona arquivos ao commit"
+    echo "-b, --branch         Executa o comando branch"
+    echo "-sc, --show-current  Mostra o branch atual"
+    echo "-ch, --checkout      Executa o comando checkout"
+    echo "-co, --commit        Executa o comando commit"
+    echo "-f, --fetch          Executa o comando fetch"
+    echo "-pl, --pull          Executa o comando pull"
+    echo "-ps, --push          Executa o comando push"
+    exit 1
+}
+
+case "$SUBCOMANDO" in
+    -a | --add)
+        git add "$@"
+        ;;
+    -b | --branch)
+        git branch "$@"
+        ;;
+    -sc | --show-current)
+        git branch --show-current
+        ;;
+    -ch | --checkout)
+        git checkout "$@"
+        ;;
+    -co | --commit)
+        commit "$@"
+        ;;
+    -f | --fetch)
+        git fetch "$@"
+        ;;
+    -pl | --pull)
+        git pull "$@"
+        ;;
+    -ps | --push)
+        push "$@"
+        ;;
+    *)
+        help
+        ;;
+esac
