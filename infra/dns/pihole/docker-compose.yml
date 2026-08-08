@@ -1,6 +1,6 @@
 services:
   pihole:
-    container_name: dsn
+    container_name: pihole
     image: pihole/pihole:latest
     restart: unless-stopped
     ports:

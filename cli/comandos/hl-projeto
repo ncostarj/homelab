@@ -13,13 +13,12 @@ CYAN='\033[0;36m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# SCRIPT_DIR="$(basename $(pwd))"
-BASE_DIR="/home/$(whoami)/Projetos/fintools"
+BASE_DIR="/home/$(whoami)/Projetos/homelab"
 APPS_DIR="${BASE_DIR}/apps"
-PROYX_DIR="${BASE_DIR}/infra"
 TEMPLATES_DIR="${BASE_DIR}/shared/templates"
-NGINX_ENABLED_DIR="${PROYX_DIR}/conf.d/enabled"
-NGINX_AVAILABLE_DIR="${PROYX_DIR}/conf.d/available"
+PROYX_DIR="${BASE_DIR}/infra/proxy/nginx"
+NGINX_ENABLED_DIR="${PROYX_DIR}/vhosts/enabled"
+NGINX_AVAILABLE_DIR="${PROYX_DIR}/vhosts/available"
 
 help() {
     echo "Uso: hl ia [comando]"
@@ -103,6 +102,7 @@ iniciar_projeto() {
         exit 1
     fi
 
+    # Passo 3: Versão do projeto
     echo -e "${YELLOW} Projeto ${TECH} ${NC}"
     read -p "   Qual é a versão do ${TECH}: " VERSAO
 
@@ -112,7 +112,7 @@ iniciar_projeto() {
     fi
     echo ""
 
-    # Passo 3: Origem do projeto
+    # Passo 4: Origem do projeto
     echo -e "${YELLOW}📦 Passo 3: Origem do projeto${NC}"
     read -p "   O projeto está versionado? (s/n): " VERSIONADO
 
@@ -161,8 +161,21 @@ iniciar_projeto() {
     fi
     echo ""
 
-    echo "config/*" >> "$PROJECT_DIR/src/.gitignore"
-    echo "docker-compose.override.yml" >> "$PROJECT_DIR/src/.gitignore"
+    echo -e "${GREEN}   ✅ Gerando o arquivo .env a partir do .env.example${NC}"
+    cp "$PROJECT_DIR/src/.env.example" "$PROJECT_DIR/src/.env"
+    echo ""
+
+    sed -i "s/DB_CONNECTION=sqlite/DB_CONNECTION=mysql/g" "${PROJECT_DIR}/src/.env"
+    sed -i "s/# DB_HOST=127.0.0.1/DB_HOST=mysql/g" "${PROJECT_DIR}/src/.env"
+    sed -i "s/# DB_PORT/DB_PORT/g" "${PROJECT_DIR}/src/.env"
+    sed -i "s/# DB_DATABASE=laravel/DB_DATABASE=$NOME_PROJETO/g" "${PROJECT_DIR}/src/.env"
+    sed -i "s/# DB_USERNAME=root/DB_USERNAME=$NOME_PROJETO/g" "${PROJECT_DIR}/src/.env"
+    sed -i "s/# DB_PASSWORD=/DB_PASSWORD=${NOME_PROJETO}123/g" "${PROJECT_DIR}/src/.env"
+    sed -i "s/SESSION_DRIVER=database/SESSION_DRIVER=file/g" "${PROJECT_DIR}/src/.env"
+
+    # ignorando arquivos de desenvolvimento local
+    echo "config/*" >> "$PROJECT_DIR/.gitignore"
+    echo "docker-compose.override.yml" >> "$PROJECT_DIR/.gitignore"
 
     # Criar pastas config/conf.d
     echo -e "${YELLOW}📁 Passo 4: Criando estrutura de configuração${NC}"
@@ -180,20 +193,25 @@ iniciar_projeto() {
     echo -e "${YELLOW}🐳 Passo 6: Gerando docker-compose.yml${NC}"
 
     EXISTING_COMPOSE=""
+    COMPOSE_FILE=""
+    
+    if [ -f "$PROJECT_DIR/src/docker-compose.yml" ] || [ -f "$PROJECT_DIR/src/docker-compose.yaml" ]; then
+        mv "$PROJECT_DIR/src/docker-compose.yml" "$PROJECT_DIR/docker-compose.yml"
+    fi
 
     if [ -f "$PROJECT_DIR/docker-compose.yml" ] || [ -f "$PROJECT_DIR/docker-compose.yaml" ]; then
         EXISTING_COMPOSE="$PROJECT_DIR"
-    elif [ -f "$PROJECT_DIR/src/docker-compose.yml" ] || [ -f "$PROJECT_DIR/src/docker-compose.yaml" ]; then
-        EXISTING_COMPOSE="$PROJECT_DIR/src"
     fi
 
     if [ -n "$EXISTING_COMPOSE" ]; then
         echo -e "${YELLOW}   ⚠️  docker-compose já encontrado em: $EXISTING_COMPOSE${NC}"
         sed "s/padrao/$NOME_PROJETO/g" "$TEMPLATES_DIR/docker-compose-padrao.yml" > "$PROJECT_DIR/docker-compose.override.yml"
         echo -e "${GREEN}   ✅ docker-compose.override.yml criado (compose existente mantido)${NC}"
+        COMPOSE_FILE="docker-compose.override.yml"
     else
         sed "s/padrao/$NOME_PROJETO/g" "$TEMPLATES_DIR/docker-compose-padrao.yml" > "$PROJECT_DIR/docker-compose.yml"
         echo -e "${GREEN}   ✅ docker-compose.yml criado${NC}"
+        COMPOSE_FILE="docker-compose.yml"
     fi
     echo ""
 
@@ -201,20 +219,66 @@ iniciar_projeto() {
         VERSAO="${VERSAO}-fpm"
     fi
 
-    sed -i "s/TECH/$TECH/g" "$PROJECT_DIR/docker-compose.yml"
-    sed -i "s/VERSAO/$VERSAO/g" "$PROJECT_DIR/docker-compose.yml"
+    sed -i "s/TECH/$TECH/g" "$PROJECT_DIR/${COMPOSE_FILE}"
+    sed -i "s/VERSAO/$VERSAO/g" "$PROJECT_DIR//${COMPOSE_FILE}"
 
     # Adicionar conf no proxy global (Nginx)
     echo -e "${YELLOW}🌐 Passo 7: Adicionando configuração ao proxy global${NC}"
     mkdir -p "$NGINX_ENABLED_DIR"
     sed "s/padrao/$NOME_PROJETO/g" "$TEMPLATES_DIR/global.conf" > "$NGINX_ENABLED_DIR/$NOME_PROJETO.conf"
-    echo -e "${GREEN}   ✅ $NOME_PROJETO.conf adicionado em infra/proxy/nginx/conf.d/enabled${NC}"
+    echo -e "${GREEN}   ✅ $NOME_PROJETO.conf adicionado em $NGINX_ENABLED_DIR${NC}"
     echo ""
 
-    echo -e "${YELLOW}🔄 Passo 8: Verificando proxy...${NC}"
-    if docker ps --format '{{.Names}}' | grep -q "ws"; then
+    echo -e "${YELLOW} Passo 8: Levantando container do projeto${NC}"
+    if [ -n "$EXISTING_COMPOSE" ]; then
+        docker compose -f "$PROJECT_DIR/docker-compose.override.yml" up -d
+    else
+        docker compose -f "$PROJECT_DIR/docker-compose.yml" up -d
+    fi
+    echo ""
+
+    if docker ps --format '{{.Names}}' | grep -q "proxy"; then
+
+        # composer install
+        echo -e "${YELLOW} Passo 9: Instalando dependência${NC}"
+        if [ -n "$EXISTING_COMPOSE" ]; then
+            docker compose -f "$PROJECT_DIR/docker-compose.override.yml" exec "${NOME_PROJETO}-php" composer install
+        else
+            docker compose -f "$PROJECT_DIR/docker-compose.yml" exec "${NOME_PROJETO}-php" composer install
+        fi
+        echo ""
+
+    # criacao do banco e privilegios
+    ROOT_USER="root"
+    ROOT_PASSWORD="root"
+    echo -e "${GREEN}   ⏳ Passo 10: Criando banco $NOME_PROJETO${NC}"
+    docker exec \
+            -e MYSQL_PWD="$ROOT_PASSWORD" \
+            mysql \
+            mysql \
+            -u"$ROOT_USER" \
+            -e "
+    CREATE DATABASE IF NOT EXISTS \`$DATABASE\`
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+    CREATE USER IF NOT EXISTS '$USER'@'%'
+    IDENTIFIED BY '$PASSWORD';
+
+    GRANT ALL PRIVILEGES
+    ON \`$DATABASE\`.*
+    TO '$USER'@'%';
+
+    FLUSH PRIVILEGES;
+    "
+    echo -e "${GREEN}   ✅ Banco $NOME_PROJETO criado${NC}"
+
+    # php artisan migrate dentro do projeto
+
+    echo -e "${YELLOW}🔄 Passo 11: Verificando proxy...${NC}"
+    if docker ps --format '{{.Names}}' | grep -q "proxy"; then
         echo -e "   ⏳ Reiniciando proxy..."
-        docker compose -f "$PROYX_DIR/docker-compose.yml" restart nginx-proxy 2> /dev/null \
+        docker compose -f "$PROYX_DIR/docker-compose.yml" restart nginx 2> /dev/null \
             || echo -e "${YELLOW}   ⚠️  Não foi possível reiniciar o proxy automaticamente.${NC}"
         echo -e "${GREEN}   ✅ Proxy reiniciado${NC}"
     else

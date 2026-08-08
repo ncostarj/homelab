@@ -10,9 +10,9 @@ services:
     depends_on:
       - padrao-php
     networks:
-      - fintools
+      - proxy
   padrao-php:
-    image: fintools/php:8.2
+    image: homelab/php:8.2
     hostname: padrao-php
     container_name: padrao-php
     restart: always
@@ -23,13 +23,13 @@ services:
         GID: ${GID:-1000}
     volumes:
       - ./src:/var/www/html/padrao
-      - ~/.ssh:/home/fintools/.ssh:ro
+      - ~/.ssh:/home/proxy/.ssh:ro
     working_dir: /var/www/html/padrao
     networks:
-      - fintools
+      - proxy
       - internal 
 networks:
-  fintools:
+  proxy:
     external: true
   internal:
     external: true
