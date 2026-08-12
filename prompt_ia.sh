@@ -7,7 +7,7 @@ set -euo pipefail
 # ============================================================
 
 DIR=$(pwd)
-OUTPUT_FILE="knowledge/contexto_ia.md"
+OUTPUT_FILE=".projeto/specs/contexto_ia.md"
 
 truncate -s 0 $OUTPUT_FILE
 
@@ -161,9 +161,6 @@ KERNEL_VERSION="N/A"
 
 print_hardware_table() {
 
-    local col1_width=0
-    local col2_width=0
-
     local rows=(
         "Dispositivo|$MACHINE_MODEL"
         "Modelo|$MACHINE_IDENTIFIER"
@@ -179,33 +176,112 @@ print_hardware_table() {
         "Kernel|$KERNEL_VERSION"
     )
 
+    local col1_width=0
+    local col2_width=0
+
+    # --------------------------------------------------------
+    # Calcula largura visual considerando UTF-8
+    # --------------------------------------------------------
+    # wcwidth não está disponível em todos os sistemas.
+    # Para a tabela Markdown, usamos uma abordagem baseada
+    # em caracteres, removendo bytes UTF-8 extras.
+    # --------------------------------------------------------
+
+    display_width() {
+        local text="$1"
+
+        # Remove caracteres UTF-8 de continuação para obter
+        # aproximadamente a quantidade de caracteres visíveis.
+        printf '%s' "$text" |
+            LC_ALL=C awk '
+                {
+                    gsub(/[\200-\277]/, "")
+                    print length($0)
+                }
+            '
+    }
+
+    # --------------------------------------------------------
+    # Determina largura máxima das colunas
+    # --------------------------------------------------------
+
+    local row col1 col2 width
+
     for row in "${rows[@]}"; do
+
         IFS='|' read -r col1 col2 <<< "$row"
 
-        (( ${#col1} > col1_width )) && col1_width=${#col1}
-        (( ${#col2} > col2_width )) && col2_width=${#col2}
+        width="$(display_width "$col1")"
+        (( width > col1_width )) && col1_width=$width
+
+        width="$(display_width "$col2")"
+        (( width > col2_width )) && col2_width=$width
+
     done
 
-    printf '\n' >> "$OUTPUT_FILE"
+    # --------------------------------------------------------
+    # Adiciona margem mínima
+    # --------------------------------------------------------
+
+    (( col1_width < 8 )) && col1_width=8
+    (( col2_width < 5 )) && col2_width=5
+
+    # --------------------------------------------------------
+    # Função para gerar espaços
+    # --------------------------------------------------------
+
+    spaces() {
+        local count="$1"
+
+        if (( count > 0 )); then
+            printf '%*s' "$count" ''
+        fi
+    }
+
+    # --------------------------------------------------------
+    # Linha horizontal
+    # --------------------------------------------------------
+
+    local separator1
+    local separator2
+
+    separator1="$(printf '%*s' "$col1_width" '' | tr ' ' '-')"
+    separator2="$(printf '%*s' "$col2_width" '' | tr ' ' '-')"
+
+    # --------------------------------------------------------
+    # Saída
+    # --------------------------------------------------------
+
+    printf '' >> "$OUTPUT_FILE"
     printf 'Considere EXATAMENTE este hardware:\n\n' >> "$OUTPUT_FILE"
 
-    printf '| %-*s | %-*s |\n' \
-        "$col1_width" "Recurso" \
-        "$col2_width" "Valor" \
+    printf '| %s | %s |\n' \
+        "Recurso$(spaces $((col1_width - $(display_width "Recurso"))))" \
+        "Valor$(spaces $((col2_width - $(display_width "Valor"))))" \
         >> "$OUTPUT_FILE"
 
-    printf '|-%-*s-|-%-*s-|\n' \
-        "$col1_width" "$(printf '%*s' "$col1_width" '' | tr ' ' '-')" \
-        "$col2_width" "$(printf '%*s' "$col2_width" '' | tr ' ' '-')" \
+    printf '|-%s-|-%s-|\n' \
+        "$separator1" \
+        "$separator2" \
         >> "$OUTPUT_FILE"
 
     for row in "${rows[@]}"; do
+
         IFS='|' read -r col1 col2 <<< "$row"
 
-        printf '| %-*s | %-*s |\n' \
-            "$col1_width" "$col1" \
-            "$col2_width" "$col2" \
+        local width1
+        local width2
+
+        width1="$(display_width "$col1")"
+        width2="$(display_width "$col2")"
+
+        printf '| %s%s | %s%s |\n' \
+            "$col1" \
+            "$(spaces $((col1_width - width1)))" \
+            "$col2" \
+            "$(spaces $((col2_width - width2)))" \
             >> "$OUTPUT_FILE"
+
     done
 
     printf '\n' >> "$OUTPUT_FILE"
@@ -369,191 +445,401 @@ elif [[ "$OS" == "Linux" ]]; then
     # Arquitetura
     # --------------------------------------------------------
 
+    ARCH="$(uname -m 2>/dev/null || true)"
+
     case "$ARCH" in
-        x86_64)
+        x86_64|amd64)
             CPU_PLATFORM="Intel/AMD"
             ;;
         aarch64|arm64)
             CPU_PLATFORM="ARM"
             ;;
+        armv7l|armv6l)
+            CPU_PLATFORM="ARM"
+            ;;
+        *)
+            CPU_PLATFORM="N/A"
+            ;;
     esac
 
-    # --------------------------------------------------------
-    # Modelo
-    # --------------------------------------------------------
 
-    MACHINE_MODEL="$(
-        cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null || true
-    )
+    # ========================================================
+    # Modelo do equipamento
+    # ========================================================
 
-    # --------------------------------------------------------
-    # Identificador
-    # --------------------------------------------------------
+    MACHINE_MODEL=""
 
-    MACHINE_IDENTIFIER="$(
-        cat /sys/devices/virtual/dmi/id/product_version 2>/dev/null || true
-    )
+    if [[ -r /sys/devices/virtual/dmi/id/product_name ]]; then
+        MACHINE_MODEL="$(
+            tr -d '\0' \
+                < /sys/devices/virtual/dmi/id/product_name 2>/dev/null
+        )"
+    fi
 
-    # --------------------------------------------------------
-    # CPU
-    # --------------------------------------------------------
+    # Fallback para máquinas que não possuem DMI
+    if [[ -z "$MACHINE_MODEL" ]] && command -v hostnamectl >/dev/null 2>&1; then
+        MACHINE_MODEL="$(
+            hostnamectl 2>/dev/null |
+                awk -F': ' '/Hardware Model:/ {print $2; exit}'
+        )"
+    fi
 
-    CHIP="$(
-        lscpu 2>/dev/null |
-        awk -F': *' '
-            /^Model name:/ {
-                print $2
-                exit
-            }
-        '
-    )"
 
-    # --------------------------------------------------------
-    # Memória
-    # --------------------------------------------------------
+    # ========================================================
+    # Identificador / versão do modelo
+    # ========================================================
 
-    MEMORY="$(
-        free -h 2>/dev/null |
-        awk '
-            /^Mem:/ {
-                print $2
-                exit
-            }
-        '
-    )"
+    MACHINE_IDENTIFIER=""
 
-    # --------------------------------------------------------
-    # CPU
-    # --------------------------------------------------------
+    if [[ -r /sys/devices/virtual/dmi/id/product_version ]]; then
+        MACHINE_IDENTIFIER="$(
+            tr -d '\0' \
+                < /sys/devices/virtual/dmi/id/product_version 2>/dev/null
+        )"
+    fi
 
-    LOGICAL_CPUS="$(
-        nproc 2>/dev/null || true
-    )"
+    # Em máquinas onde product_version não existe,
+    # tenta obter o nome da placa.
+    if [[ -z "$MACHINE_IDENTIFIER" ]] &&
+       [[ -r /sys/devices/virtual/dmi/id/board_name ]]; then
 
-    PHYSICAL_CORES="$(
-        lscpu 2>/dev/null |
-        awk -F': *' '
-            /^Core\(s\) per socket:/ {
-                cores = $2
-            }
+        MACHINE_IDENTIFIER="$(
+            tr -d '\0' \
+                < /sys/devices/virtual/dmi/id/board_name 2>/dev/null
+        )"
+    fi
 
-            /^Socket\(s\):/ {
-                sockets = $2
-            }
 
-            END {
-                if (cores != "" && sockets != "")
-                    print cores * sockets
-            }
-        '
-    )"
+    # ========================================================
+    # CPU / Chip
+    # ========================================================
 
-    # --------------------------------------------------------
+    CHIP=""
+
+    if command -v lscpu >/dev/null 2>&1; then
+
+        CHIP="$(
+            lscpu 2>/dev/null |
+                awk -F': *' '
+                    /^Model name:/ {
+                        print $2
+                        exit
+                    }
+                '
+        )"
+
+        # Algumas arquiteturas usam "Model:"
+        if [[ -z "$CHIP" ]]; then
+            CHIP="$(
+                lscpu 2>/dev/null |
+                    awk -F': *' '
+                        /^Model:/ {
+                            print $2
+                            exit
+                        }
+                    '
+            )"
+        fi
+
+    fi
+
+    # Fallback x86
+    if [[ -z "$CHIP" ]] &&
+       [[ -r /proc/cpuinfo ]]; then
+
+        CHIP="$(
+            awk -F': *' '
+                /^model name[[:space:]]*:/ {
+                    print $2
+                    exit
+                }
+
+                /^Hardware[[:space:]]*:/ {
+                    print $2
+                    exit
+                }
+
+                /^Processor[[:space:]]*:/ {
+                    print $2
+                    exit
+                }
+            ' /proc/cpuinfo
+        )"
+    fi
+
+
+    # ========================================================
+    # RAM
+    # ========================================================
+
+    MEMORY=""
+
+    if [[ -r /proc/meminfo ]]; then
+
+        MEMORY="$(
+            awk '
+                /^MemTotal:/ {
+                    total_kb=$2
+
+                    if (total_kb >= 1048576)
+                        printf "%.1f GiB\n", total_kb / 1048576
+                    else
+                        printf "%.0f MiB\n", total_kb / 1024
+
+                    exit
+                }
+            ' /proc/meminfo
+        )"
+
+    fi
+
+
+    # ========================================================
+    # CPUs lógicas
+    # ========================================================
+
+    LOGICAL_CPUS=""
+
+    if command -v nproc >/dev/null 2>&1; then
+        LOGICAL_CPUS="$(nproc 2>/dev/null || true)"
+    fi
+
+    if [[ -z "$LOGICAL_CPUS" ]]; then
+        LOGICAL_CPUS="$(
+            grep -c '^processor[[:space:]]*:' /proc/cpuinfo 2>/dev/null || true
+        )"
+    fi
+
+
+    # ========================================================
+    # Núcleos físicos
+    # ========================================================
+
+    PHYSICAL_CORES=""
+
+    if command -v lscpu >/dev/null 2>&1; then
+
+        PHYSICAL_CORES="$(
+            lscpu 2>/dev/null |
+                awk -F': *' '
+                    /^Core\(s\) per socket:/ {
+                        cores=$2
+                    }
+
+                    /^Socket\(s\):/ {
+                        sockets=$2
+                    }
+
+                    END {
+                        if (cores != "" && sockets != "")
+                            print cores * sockets
+                    }
+                '
+        )"
+
+    fi
+
+    # Fallback para /proc/cpuinfo
+    if [[ -z "$PHYSICAL_CORES" ]] ||
+       [[ "$PHYSICAL_CORES" == "0" ]]; then
+
+        PHYSICAL_CORES="$(
+            awk '
+                /^physical id[[:space:]]*:/ {
+                    physical[$4]=1
+                }
+
+                /^core id[[:space:]]*:/ {
+                    key=$4
+                    cores[key]=1
+                }
+
+                END {
+                    if (length(cores) > 0)
+                        print length(cores)
+                }
+            ' /proc/cpuinfo 2>/dev/null
+        )"
+
+    fi
+
+    # ========================================================
     # Performance / Efficiency Cores
-    # --------------------------------------------------------
-    # Nem todo Linux expõe essa informação.
-    # Mantemos vazio quando não estiver disponível.
+    # ========================================================
 
     PERFORMANCE_CORES=""
     EFFICIENCY_CORES=""
 
+    # Linux expõe core_type principalmente em CPUs híbridas,
+    # como Intel Alder Lake / Raptor Lake etc.
+    #
+    # 1 = Efficiency Core
+    # 2 = Performance Core
+    #
+    # O arquivo correto fica normalmente em:
+    #
+    # /sys/devices/system/cpu/cpu*/topology/core_type
+    # ========================================================
+
     if [[ -d /sys/devices/system/cpu ]]; then
 
-        PERFORMANCE_CORES="$(
-            find /sys/devices/system/cpu \
-                -maxdepth 2 \
-                -name core_type \
-                -type f \
-                -exec grep -l '^2$' {} \; 2>/dev/null |
-            wc -l |
-            awk '{print $1}'
-        )"
+        performance_count=0
+        efficiency_count=0
+        core_type_file=""
+        core_type=""
 
-        EFFICIENCY_CORES="$(
-            find /sys/devices/system/cpu \
-                -maxdepth 2 \
-                -name core_type \
-                -type f \
-                -exec grep -l '^1$' {} \; 2>/dev/null |
-            wc -l |
-            awk '{print $1}'
-        )"
+        for core_type_file in \
+            /sys/devices/system/cpu/cpu[0-9]*/topology/core_type
+        do
 
-        [[ "$PERFORMANCE_CORES" == "0" ]] && PERFORMANCE_CORES=""
-        [[ "$EFFICIENCY_CORES" == "0" ]] && EFFICIENCY_CORES=""
+            [[ -r "$core_type_file" ]] || continue
+
+            core_type="$(cat "$core_type_file" 2>/dev/null)"
+
+            case "$core_type" in
+                2)
+                    ((performance_count++))
+                    ;;
+                1)
+                    ((efficiency_count++))
+                    ;;
+            esac
+
+        done
+
+        if (( performance_count > 0 )); then
+            PERFORMANCE_CORES="$performance_count"
+        fi
+
+        if (( efficiency_count > 0 )); then
+            EFFICIENCY_CORES="$efficiency_count"
+        fi
 
     fi
 
-    # --------------------------------------------------------
+    # ========================================================
     # GPU
-    # --------------------------------------------------------
+    # ========================================================
 
-    GPU="$(
-        lspci 2>/dev/null |
-        awk -F': ' '
-            /VGA compatible controller:/ {
-                print $2
-                exit
-            }
+    GPU=""
 
-            /3D controller:/ {
-                print $2
-                exit
-            }
+    if command -v lspci >/dev/null 2>&1; then
 
-            /Display controller:/ {
-                print $2
-                exit
-            }
-        '
-    )"
+        GPU="$(
+            lspci 2>/dev/null |
+                awk -F': ' '
+                    /VGA compatible controller:/ {
+                        print $2
+                        exit
+                    }
 
-    if [[ -n "$GPU" ]]; then
-        GPU_TYPE="GPU"
+                    /3D controller:/ {
+                        print $2
+                        exit
+                    }
+
+                    /Display controller:/ {
+                        print $2
+                        exit
+                    }
+                '
+        )"
+
     fi
 
-    # --------------------------------------------------------
-    # Linux
-    # --------------------------------------------------------
+    # Fallback para sistemas sem lspci
+    if [[ -z "$GPU" ]] &&
+       [[ -d /sys/class/drm ]]; then
 
-    OS_VERSION="$(
-        awk -F= '
-            /^PRETTY_NAME=/ {
-                gsub(/"/, "", $2)
-                print $2
-                exit
-            }
-        ' /etc/os-release 2>/dev/null
-    )"
+        for drm_card in /sys/class/drm/card[0-9]; do
 
-    # --------------------------------------------------------
+            [[ -e "$drm_card/device" ]] || continue
+
+            vendor=""
+            device=""
+
+            if [[ -r "$drm_card/device/vendor" ]]; then
+                vendor="$(cat "$drm_card/device/vendor" 2>/dev/null)"
+            fi
+
+            if [[ -r "$drm_card/device/device" ]]; then
+                device="$(cat "$drm_card/device/device" 2>/dev/null)"
+            fi
+
+            if [[ -n "$vendor" ]]; then
+                GPU="$vendor"
+
+                [[ -n "$device" ]] &&
+                    GPU="$GPU $device"
+
+                break
+            fi
+
+        done
+
+    fi
+
+
+    # ========================================================
+    # Distribuição Linux
+    # ========================================================
+
+    OS_VERSION=""
+
+    if [[ -r /etc/os-release ]]; then
+
+        OS_VERSION="$(
+            . /etc/os-release
+            printf '%s' "${PRETTY_NAME:-${NAME:-Linux}}"
+        )"
+
+    fi
+
+    # Fallback
+    if [[ -z "$OS_VERSION" ]] &&
+       command -v hostnamectl >/dev/null 2>&1; then
+
+        OS_VERSION="$(
+            hostnamectl 2>/dev/null |
+                awk -F': ' '/Operating System:/ {print $2; exit}'
+        )"
+
+    fi
+
+
+    # ========================================================
     # Kernel
-    # --------------------------------------------------------
+    # ========================================================
 
-    KERNEL_VERSION="$(uname -r)"
+    KERNEL_VERSION="$(uname -r 2>/dev/null || true)"
 
 fi
+
 
 # ============================================================
 # Normalização
 # ============================================================
 
-[[ -n "$OS_FLAVOR" ]] || OS_FLAVOR="N/A"
-[[ -n "$MACHINE_MODEL" ]] || MACHINE_MODEL="N/A"
+[[ -n "$OS_FLAVOR" ]]          || OS_FLAVOR="N/A"
+[[ -n "$MACHINE_MODEL" ]]      || MACHINE_MODEL="N/A"
 [[ -n "$MACHINE_IDENTIFIER" ]] || MACHINE_IDENTIFIER="N/A"
-[[ -n "$CPU_PLATFORM" ]] || CPU_PLATFORM="N/A"
-[[ -n "$CHIP" ]] || CHIP="N/A"
-[[ -n "$MEMORY" ]] || MEMORY="N/A"
+[[ -n "$CPU_PLATFORM" ]]       || CPU_PLATFORM="N/A"
+[[ -n "$CHIP" ]]               || CHIP="N/A"
+[[ -n "$MEMORY" ]]             || MEMORY="N/A"
 
-[[ -n "$PHYSICAL_CORES" ]] || PHYSICAL_CORES="N/A"
-[[ -n "$PERFORMANCE_CORES" ]] || PERFORMANCE_CORES="N/A"
-[[ -n "$EFFICIENCY_CORES" ]] || EFFICIENCY_CORES="N/A"
-[[ -n "$LOGICAL_CPUS" ]] || LOGICAL_CPUS="N/A"
+[[ -n "$PHYSICAL_CORES" ]]     || PHYSICAL_CORES="N/A"
+[[ -n "$PERFORMANCE_CORES" ]]  || PERFORMANCE_CORES="N/A"
+[[ -n "$EFFICIENCY_CORES" ]]   || EFFICIENCY_CORES="N/A"
+[[ -n "$LOGICAL_CPUS" ]]       || LOGICAL_CPUS="N/A"
 
-[[ -n "$GPU" ]] || GPU="N/A"
-[[ -n "$GPU_TYPE" ]] || GPU_TYPE="N/A"
-[[ -n "$OS_VERSION" ]] || OS_VERSION="N/A"
-[[ -n "$KERNEL_VERSION" ]] || KERNEL_VERSION="N/A"
+[[ -n "$GPU" ]]                || GPU="N/A"
+[[ -n "$GPU_TYPE" ]]           || GPU_TYPE="N/A"
+[[ -n "$OS_VERSION" ]]         || OS_VERSION="N/A"
+[[ -n "$KERNEL_VERSION" ]]     || KERNEL_VERSION="N/A"
+
+# ============================================================
+# Gera tabela
+# ============================================================
 
 print_hardware_table
 
@@ -836,13 +1122,13 @@ Se um modelo maior trouxer ganho pequeno e custo elevado neste hardware, prefira
 Quero utilizar arquivos persistentes em:
 
 \`\`\`text
-knowledge/
+.projeto/specs/
 \`\`\`
 
 Estrutura inicial:
 
 \`\`\`text
-knowledge/
+.projeto/specs/
 ├── projeto.md
 ├── arquitetura.md
 ├── estrutura.md
@@ -917,7 +1203,7 @@ script
    ↓
 análise estrutural
    ↓
-knowledge/*.md
+.projeto/specs/*.md
 \`\`\`
 
 O script deve gerar, quando possível:
@@ -1131,7 +1417,7 @@ Avalie:
 Defina:
 
 \`\`\`text
-knowledge/
+.projeto/specs/
 \`\`\`
 
 e como ele será utilizado.
@@ -1202,7 +1488,7 @@ Em poucas linhas:
 * qual modelo principal;
 * se Nginx deve permanecer no caminho;
 * se autocomplete deve ser utilizado;
-* qual mecanismo usar para \`knowledge/\`.
+* qual mecanismo usar para \`.projeto/specs/\`.
 
 ---
 
@@ -1299,7 +1585,7 @@ Escolha **um modelo principal**.
 Mostre:
 
 \`\`\`text
-knowledge/
+.projeto/specs/
 ├── projeto.md
 ├── arquitetura.md
 ├── estrutura.md
@@ -1369,9 +1655,9 @@ Demonstre exemplos reais:
 Analise este projeto.
 
 Considere:
-knowledge/projeto.md
-knowledge/arquitetura.md
-knowledge/estrutura.md
+.projeto/specs/projeto.md
+.projeto/specs/arquitetura.md
+.projeto/specs/estrutura.md
 
 Identifique os principais problemas arquiteturais.
 \`\`\`
@@ -1384,7 +1670,7 @@ Depois exemplos de:
 * criação de função;
 * análise de múltiplos arquivos;
 * análise de Git diff;
-* atualização do \`knowledge/\`.
+* atualização do \`.projeto/specs/\`.
 
 ---
 
