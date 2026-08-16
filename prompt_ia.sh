@@ -9,7 +9,12 @@ set -euo pipefail
 DIR=$(pwd)
 OUTPUT_FILE=".projeto/specs/contexto_ia.md"
 
-truncate -s 0 $OUTPUT_FILE
+# Garante que o diretório de destino existe antes de qualquer escrita.
+mkdir -p "$(dirname "$OUTPUT_FILE")"
+
+# Todo o restante do script escreve em stdout; a partir daqui, stdout
+# é redirecionado para o arquivo final (cria/trunca em uma única operação).
+exec > "$OUTPUT_FILE"
 
 # ============================================================
 # Funções auxiliares
@@ -38,7 +43,7 @@ TREE_OUTPUT="$(
       "../$(basename "$DIR")" 2>/dev/null || true
 )"
 
-cat >> "$OUTPUT_FILE" <<EOF
+cat <<EOF
 # Pesquisa e Projeto — VSCode + Ollama + LLM Local para Desenvolvimento
 
 ## 1. PAPEL
@@ -129,17 +134,9 @@ Sempre que possível, priorize documentação oficial.
 
 EOF
 
-# ============================================================
-# Sistema operacional
-# ============================================================
-
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 HOSTNAME="$(hostname)"
-
-# ============================================================
-# Variáveis de Hardware
-# ============================================================
 
 OS_FLAVOR="N/A"
 MACHINE_MODEL="N/A"
@@ -158,6 +155,7 @@ GPU_TYPE="N/A"
 
 OS_VERSION="N/A"
 KERNEL_VERSION="N/A"
+NVIDIA_GPU_MODEL="N/A"
 
 print_hardware_table() {
 
@@ -166,7 +164,7 @@ print_hardware_table() {
         "Modelo|$MACHINE_IDENTIFIER"
         "Chip|$CHIP"
         "Arquitetura|$ARCH"
-        "RAM|$MEMORY"
+        "RAM detectada|$MEMORY"
         "Núcleos físicos|$PHYSICAL_CORES"
         "Performance cores|$PERFORMANCE_CORES"
         "Efficiency cores|$EFFICIENCY_CORES"
@@ -179,19 +177,9 @@ print_hardware_table() {
     local col1_width=0
     local col2_width=0
 
-    # --------------------------------------------------------
-    # Calcula largura visual considerando UTF-8
-    # --------------------------------------------------------
-    # wcwidth não está disponível em todos os sistemas.
-    # Para a tabela Markdown, usamos uma abordagem baseada
-    # em caracteres, removendo bytes UTF-8 extras.
-    # --------------------------------------------------------
-
     display_width() {
         local text="$1"
 
-        # Remove caracteres UTF-8 de continuação para obter
-        # aproximadamente a quantidade de caracteres visíveis.
         printf '%s' "$text" |
             LC_ALL=C awk '
                 {
@@ -201,10 +189,6 @@ print_hardware_table() {
             '
     }
 
-    # --------------------------------------------------------
-    # Determina largura máxima das colunas
-    # --------------------------------------------------------
-
     local row col1 col2 width
 
     for row in "${rows[@]}"; do
@@ -212,23 +196,15 @@ print_hardware_table() {
         IFS='|' read -r col1 col2 <<< "$row"
 
         width="$(display_width "$col1")"
-        (( width > col1_width )) && col1_width=$width
+        if (( width > col1_width )); then col1_width=$width; fi
 
         width="$(display_width "$col2")"
-        (( width > col2_width )) && col2_width=$width
+        if (( width > col2_width )); then col2_width=$width; fi
 
     done
 
-    # --------------------------------------------------------
-    # Adiciona margem mínima
-    # --------------------------------------------------------
-
-    (( col1_width < 8 )) && col1_width=8
-    (( col2_width < 5 )) && col2_width=5
-
-    # --------------------------------------------------------
-    # Função para gerar espaços
-    # --------------------------------------------------------
+    if (( col1_width < 8 )); then col1_width=8; fi
+    if (( col2_width < 5 )); then col2_width=5; fi
 
     spaces() {
         local count="$1"
@@ -238,32 +214,24 @@ print_hardware_table() {
         fi
     }
 
-    # --------------------------------------------------------
-    # Linha horizontal
-    # --------------------------------------------------------
-
     local separator1
     local separator2
 
     separator1="$(printf '%*s' "$col1_width" '' | tr ' ' '-')"
     separator2="$(printf '%*s' "$col2_width" '' | tr ' ' '-')"
 
-    # --------------------------------------------------------
-    # Saída
-    # --------------------------------------------------------
-
-    printf '' >> "$OUTPUT_FILE"
-    printf 'Considere EXATAMENTE este hardware:\n\n' >> "$OUTPUT_FILE"
+    printf ''
+    printf 'Considere EXATAMENTE este hardware:\n\n'
 
     printf '| %s | %s |\n' \
         "Recurso$(spaces $((col1_width - $(display_width "Recurso"))))" \
         "Valor$(spaces $((col2_width - $(display_width "Valor"))))" \
-        >> "$OUTPUT_FILE"
+       
 
     printf '|-%s-|-%s-|\n' \
         "$separator1" \
         "$separator2" \
-        >> "$OUTPUT_FILE"
+       
 
     for row in "${rows[@]}"; do
 
@@ -280,32 +248,28 @@ print_hardware_table() {
             "$(spaces $((col1_width - width1)))" \
             "$col2" \
             "$(spaces $((col2_width - width2)))" \
-            >> "$OUTPUT_FILE"
+           
 
     done
 
-    printf '\n' >> "$OUTPUT_FILE"
+    printf '\n'
 }
 
-# ============================================================
-# Identificação do Hardware
-# ============================================================
+# A partir daqui, a detecção é 'melhor esforço': cada comando externo
+# (hostnamectl, lscpu, lspci, system_profiler, sysctl...) pode legitimamente
+# falhar ou não existir dependendo da máquina. Isso não é um erro do script -
+# por isso desligamos set -e/pipefail só nesta seção. Os valores já têm
+# default "N/A" e são normalizados logo depois.
+set +e
+set +o pipefail
 
 if [[ "$OS" == "Darwin" ]]; then
 
     OS_FLAVOR="macOS"
 
-    # --------------------------------------------------------
-    # Hardware geral
-    # --------------------------------------------------------
-
     HARDWARE_INFO="$(
         system_profiler SPHardwareDataType 2>/dev/null || true
     )"
-
-    # --------------------------------------------------------
-    # Modelo
-    # --------------------------------------------------------
 
     MACHINE_MODEL="$(
         printf '%s\n' "$HARDWARE_INFO" |
@@ -317,10 +281,6 @@ if [[ "$OS" == "Darwin" ]]; then
         '
     )"
 
-    # --------------------------------------------------------
-    # Identificador
-    # --------------------------------------------------------
-
     MACHINE_IDENTIFIER="$(
         printf '%s\n' "$HARDWARE_INFO" |
         awk -F': ' '
@@ -331,10 +291,6 @@ if [[ "$OS" == "Darwin" ]]; then
         '
     )"
 
-    # --------------------------------------------------------
-    # Chip Apple Silicon
-    # --------------------------------------------------------
-
     CHIP="$(
         printf '%s\n' "$HARDWARE_INFO" |
         awk -F': ' '
@@ -344,10 +300,6 @@ if [[ "$OS" == "Darwin" ]]; then
             }
         '
     )"
-
-    # --------------------------------------------------------
-    # Processador Intel
-    # --------------------------------------------------------
 
     if [[ -z "$CHIP" ]]; then
 
@@ -369,10 +321,6 @@ if [[ "$OS" == "Darwin" ]]; then
         CPU_PLATFORM="Intel"
     fi    
 
-    # --------------------------------------------------------
-    # Memória
-    # --------------------------------------------------------
-
     MEMORY="$(
         printf '%s\n' "$HARDWARE_INFO" |
         awk -F': ' '
@@ -383,19 +331,11 @@ if [[ "$OS" == "Darwin" ]]; then
         '
     )"
 
-    # --------------------------------------------------------
-    # CPU
-    # --------------------------------------------------------
-
     LOGICAL_CPUS="$(get_sysctl hw.logicalcpu)"
     PHYSICAL_CORES="$(get_sysctl hw.physicalcpu)"
 
     PERFORMANCE_CORES="$(get_sysctl hw.perflevel0.physicalcpu)"
     EFFICIENCY_CORES="$(get_sysctl hw.perflevel1.physicalcpu)"
-
-    # --------------------------------------------------------
-    # GPU
-    # --------------------------------------------------------
 
     GPU="$(
         system_profiler SPDisplaysDataType 2>/dev/null |
@@ -423,27 +363,15 @@ if [[ "$OS" == "Darwin" ]]; then
         GPU_TYPE="GPU"
     fi
 
-    # --------------------------------------------------------
-    # macOS
-    # --------------------------------------------------------
-
     OS_VERSION="$(
         sw_vers -productVersion 2>/dev/null || true
     )"
-
-    # --------------------------------------------------------
-    # Kernel
-    # --------------------------------------------------------
 
     KERNEL_VERSION="$(uname -r)"
 
 elif [[ "$OS" == "Linux" ]]; then
 
     OS_FLAVOR="Linux"
-
-    # --------------------------------------------------------
-    # Arquitetura
-    # --------------------------------------------------------
 
     ARCH="$(uname -m 2>/dev/null || true)"
 
@@ -463,10 +391,6 @@ elif [[ "$OS" == "Linux" ]]; then
     esac
 
 
-    # ========================================================
-    # Modelo do equipamento
-    # ========================================================
-
     MACHINE_MODEL=""
 
     if [[ -r /sys/devices/virtual/dmi/id/product_name ]]; then
@@ -476,7 +400,6 @@ elif [[ "$OS" == "Linux" ]]; then
         )"
     fi
 
-    # Fallback para máquinas que não possuem DMI
     if [[ -z "$MACHINE_MODEL" ]] && command -v hostnamectl >/dev/null 2>&1; then
         MACHINE_MODEL="$(
             hostnamectl 2>/dev/null |
@@ -484,10 +407,6 @@ elif [[ "$OS" == "Linux" ]]; then
         )"
     fi
 
-
-    # ========================================================
-    # Identificador / versão do modelo
-    # ========================================================
 
     MACHINE_IDENTIFIER=""
 
@@ -498,8 +417,6 @@ elif [[ "$OS" == "Linux" ]]; then
         )"
     fi
 
-    # Em máquinas onde product_version não existe,
-    # tenta obter o nome da placa.
     if [[ -z "$MACHINE_IDENTIFIER" ]] &&
        [[ -r /sys/devices/virtual/dmi/id/board_name ]]; then
 
@@ -509,10 +426,6 @@ elif [[ "$OS" == "Linux" ]]; then
         )"
     fi
 
-
-    # ========================================================
-    # CPU / Chip
-    # ========================================================
 
     CHIP=""
 
@@ -528,7 +441,6 @@ elif [[ "$OS" == "Linux" ]]; then
                 '
         )"
 
-        # Algumas arquiteturas usam "Model:"
         if [[ -z "$CHIP" ]]; then
             CHIP="$(
                 lscpu 2>/dev/null |
@@ -543,7 +455,6 @@ elif [[ "$OS" == "Linux" ]]; then
 
     fi
 
-    # Fallback x86
     if [[ -z "$CHIP" ]] &&
        [[ -r /proc/cpuinfo ]]; then
 
@@ -567,10 +478,8 @@ elif [[ "$OS" == "Linux" ]]; then
         )"
     fi
 
+    CPU_PLATFORM="$CHIP"
 
-    # ========================================================
-    # RAM
-    # ========================================================
 
     MEMORY=""
 
@@ -594,10 +503,6 @@ elif [[ "$OS" == "Linux" ]]; then
     fi
 
 
-    # ========================================================
-    # CPUs lógicas
-    # ========================================================
-
     LOGICAL_CPUS=""
 
     if command -v nproc >/dev/null 2>&1; then
@@ -610,10 +515,6 @@ elif [[ "$OS" == "Linux" ]]; then
         )"
     fi
 
-
-    # ========================================================
-    # Núcleos físicos
-    # ========================================================
 
     PHYSICAL_CORES=""
 
@@ -639,7 +540,6 @@ elif [[ "$OS" == "Linux" ]]; then
 
     fi
 
-    # Fallback para /proc/cpuinfo
     if [[ -z "$PHYSICAL_CORES" ]] ||
        [[ "$PHYSICAL_CORES" == "0" ]]; then
 
@@ -663,23 +563,8 @@ elif [[ "$OS" == "Linux" ]]; then
 
     fi
 
-    # ========================================================
-    # Performance / Efficiency Cores
-    # ========================================================
-
     PERFORMANCE_CORES=""
     EFFICIENCY_CORES=""
-
-    # Linux expõe core_type principalmente em CPUs híbridas,
-    # como Intel Alder Lake / Raptor Lake etc.
-    #
-    # 1 = Efficiency Core
-    # 2 = Performance Core
-    #
-    # O arquivo correto fica normalmente em:
-    #
-    # /sys/devices/system/cpu/cpu*/topology/core_type
-    # ========================================================
 
     if [[ -d /sys/devices/system/cpu ]]; then
 
@@ -698,10 +583,10 @@ elif [[ "$OS" == "Linux" ]]; then
 
             case "$core_type" in
                 2)
-                    ((performance_count++))
+                    performance_count=$((performance_count + 1))
                     ;;
                 1)
-                    ((efficiency_count++))
+                    efficiency_count=$((efficiency_count + 1))
                     ;;
             esac
 
@@ -717,37 +602,57 @@ elif [[ "$OS" == "Linux" ]]; then
 
     fi
 
-    # ========================================================
-    # GPU
-    # ========================================================
-
     GPU=""
 
     if command -v lspci >/dev/null 2>&1; then
 
-        GPU="$(
+        gpu_list="$(
             lspci 2>/dev/null |
-                awk -F': ' '
-                    /VGA compatible controller:/ {
-                        print $2
-                        exit
-                    }
-
-                    /3D controller:/ {
-                        print $2
-                        exit
-                    }
-
-                    /Display controller:/ {
-                        print $2
-                        exit
-                    }
-                '
+            grep -Ei 'VGA compatible controller|3D controller|Display controller'
         )"
 
-    fi
+        if [[ -n "$gpu_list" ]]; then
 
-    # Fallback para sistemas sem lspci
+            GPU_TYPE=""
+            NVIDIA_GPU_MODEL=""
+
+            while IFS= read -r gpu; do
+
+                gpu_model="$(
+                    printf '%s\n' "$gpu" |
+                    sed -E 's/^.*(VGA compatible controller|3D controller|Display controller):[[:space:]]*//'
+                )"
+
+                case "$gpu_model" in
+
+                    *NVIDIA*)
+                        NVIDIA_GPU_MODEL="$gpu_model"
+                        gpu_entry="${gpu_model} (dedicada)"
+                        ;;
+
+                    *Intel*)
+                        gpu_entry="${gpu_model} (integrada)"
+                        ;;
+
+                    *)
+                        gpu_entry="${gpu_model} (GPU)"
+                        ;;
+
+                esac
+
+                if [[ -n "$GPU_TYPE" ]]; then
+                    GPU_TYPE="${GPU_TYPE} | "
+                fi
+
+                GPU_TYPE="${GPU_TYPE}${gpu_entry}"
+
+            done <<< "$gpu_list"
+
+        fi
+
+    fi
+    
+
     if [[ -z "$GPU" ]] &&
        [[ -d /sys/class/drm ]]; then
 
@@ -780,10 +685,6 @@ elif [[ "$OS" == "Linux" ]]; then
     fi
 
 
-    # ========================================================
-    # Distribuição Linux
-    # ========================================================
-
     OS_VERSION=""
 
     if [[ -r /etc/os-release ]]; then
@@ -795,7 +696,6 @@ elif [[ "$OS" == "Linux" ]]; then
 
     fi
 
-    # Fallback
     if [[ -z "$OS_VERSION" ]] &&
        command -v hostnamectl >/dev/null 2>&1; then
 
@@ -807,18 +707,17 @@ elif [[ "$OS" == "Linux" ]]; then
     fi
 
 
-    # ========================================================
-    # Kernel
-    # ========================================================
-
     KERNEL_VERSION="$(uname -r 2>/dev/null || true)"
 
 fi
 
 
-# ============================================================
-# Normalização
-# ============================================================
+
+# Fim da seção de melhor esforço - volta ao modo estrito para o restante
+# do script (geração de arquivo, leitura do docker-compose.yml etc.),
+# onde um erro real deve interromper a execução.
+set -e
+set -o pipefail
 
 [[ -n "$OS_FLAVOR" ]]          || OS_FLAVOR="N/A"
 [[ -n "$MACHINE_MODEL" ]]      || MACHINE_MODEL="N/A"
@@ -837,17 +736,23 @@ fi
 [[ -n "$OS_VERSION" ]]         || OS_VERSION="N/A"
 [[ -n "$KERNEL_VERSION" ]]     || KERNEL_VERSION="N/A"
 
-# ============================================================
-# Gera tabela
-# ============================================================
-
 print_hardware_table
 
-cat >> "$OUTPUT_FILE" <<EOF
+cat <<EOF
 Não substitua essas informações por hardware genérico.
 
-Não utilize Intel, NVIDIA, CUDA ou arquitetura x86 como referência para recomendações de performance.
+Não substitua o hardware informado por uma configuração genérica nem faça recomendações baseadas em hardware diferente do disponível. Considere especificamente as limitações de CPU, RAM e GPU deste equipamento.
 
+EOF
+
+if [[ "$NVIDIA_GPU_MODEL" != "N/A" ]]; then
+    cat <<EOF
+Avalie explicitamente se a $NVIDIA_GPU_MODEL é utilizável pelo Ollama neste ambiente atual, considerando driver, arquitetura da GPU, suporte CUDA atual e compatibilidade da versão atual do Ollama. Não presuma que possuir uma NVIDIA implica aceleração útil.
+
+EOF
+fi
+
+cat <<EOF
 O ambiente deve ser tratado como:
 
 \`\`\`text
@@ -890,15 +795,21 @@ Atualmente:
 
 EOF
 
-COMPOSE_FILE_OLLAMA=$(cat "$DIR/infra/ia/ollama/docker-compose.yml")
+OLLAMA_COMPOSE_PATH="$DIR/infra/ia/ollama/docker-compose.yml"
 
-cat >> "$OUTPUT_FILE" <<EOF
+if [[ -r "$OLLAMA_COMPOSE_PATH" ]]; then
+    COMPOSE_FILE_OLLAMA="$(cat "$OLLAMA_COMPOSE_PATH")"
+else
+    COMPOSE_FILE_OLLAMA="# Arquivo não encontrado: $OLLAMA_COMPOSE_PATH"
+fi
+
+cat <<EOF
 \`\`\`yaml
 $COMPOSE_FILE_OLLAMA
 \`\`\`
 EOF
 
-cat >> "$OUTPUT_FILE" <<EOF
+cat <<EOF
 Analise cada parâmetro relacionado ao desempenho do Ollama.
 
 Para cada parâmetro, classifique como:
@@ -1746,8 +1657,8 @@ A solução desejada deve ser **Baixa**.
 14. Não altere componentes existentes sem justificar.
 15. Não altere parâmetros do Ollama sem explicar o benefício.
 16. Não utilize hardware diferente do informado.
-17. Considere sempre 8 GB de RAM.
-18. Considere sempre Apple Silicon / arm64.
+17. Considere sempre $MEMORY de RAM.
+18. Considere sempre $CPU_PLATFORM / $ARCH.
 19. Priorize baixa latência.
 20. Priorize simplicidade.
 21. Escolha uma solução principal.
@@ -1767,7 +1678,7 @@ O objetivo não é construir a solução tecnicamente mais sofisticada.
 
 O objetivo é determinar:
 
-> **Qual é a menor arquitetura capaz de fornecer uma boa experiência de pair programming local no VSCode utilizando Ollama, considerando especificamente um MacBook Neo com Apple A18 Pro e 8 GB de RAM?**
+> **Qual é a menor arquitetura capaz de fornecer uma boa experiência de pair programming local no VSCode utilizando Ollama, considerando especificamente um $MACHINE_MODEL com $CHIP e $MEMORY de RAM?**
 
 A resposta deve privilegiar:
 

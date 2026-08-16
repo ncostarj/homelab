@@ -88,33 +88,35 @@ Sempre que possível, priorize documentação oficial.
 
 Considere EXATAMENTE este hardware:
 
-| Recurso           | Valor                                                                 |
-|-------------------|-----------------------------------------------------------------------|
-| Dispositivo       | Vostro 5470                                                           |
-| Modelo            | 0F7NWH                                                                |
-| Chip              | Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz                              |
-| Arquitetura       | x86_64                                                                |
-| RAM               | 7.7 GiB                                                               |
-| Núcleos físicos   | 2                                                                     |
-| Performance cores | N/A                                                                   |
-| Efficiency cores  | N/A                                                                   |
-| CPUs lógicas      | 4                                                                     |
-| GPU               | Intel Corporation Haswell-ULT Integrated Graphics Controller (rev 0b) |
-| Linux             | Linux Mint 22                                                         |
-| Kernel            | 6.8.0-136-generic                                                     |
+| Recurso           | Valor                                    |
+|-------------------|------------------------------------------|
+| Dispositivo       | Vostro 5470                              |
+| Modelo            | 0F7NWH                                   |
+| Chip              | Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz |
+| Arquitetura       | x86_64                                   |
+| RAM detectada     | 7.7 GiB                                  |
+| Núcleos físicos   | 2                                        |
+| Performance cores | N/A                                      |
+| Efficiency cores  | N/A                                      |
+| CPUs lógicas      | 4                                        |
+| GPU               | 0x8086 0x0a16                            |
+| Linux             | Linux Mint 22                            |
+| Kernel            | 6.8.0-136-generic                        |
 
 Não substitua essas informações por hardware genérico.
 
-Não utilize Intel, NVIDIA, CUDA ou arquitetura x86 como referência para recomendações de performance.
+Não substitua o hardware informado por uma configuração genérica nem faça recomendações baseadas em hardware diferente do disponível. Considere especificamente as limitações de CPU, RAM e GPU deste equipamento.
+
+Avalie explicitamente se a NVIDIA Corporation GK208M [GeForce GT 740M] (rev a1) é utilizável pelo Ollama neste ambiente atual, considerando driver, arquitetura da GPU, suporte CUDA atual e compatibilidade da versão atual do Ollama. Não presuma que possuir uma NVIDIA implica aceleração útil.
 
 O ambiente deve ser tratado como:
 
 ```text
-Intel/AMD
+Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz
 x86_64
 7.7 GiB RAM
 2 cores
-N/A
+Intel Corporation Haswell-ULT Integrated Graphics Controller (rev 0b) (integrada) | NVIDIA Corporation GK208M [GeForce GT 740M] (rev a1) (dedicada)
 Docker
 Linux
 ```
@@ -182,7 +184,6 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    platform: linux/arm64
     container_name: ollama
     init: true
 
@@ -223,7 +224,6 @@ services:
 
   webui:
     image: ghcr.io/open-webui/open-webui:main
-    platform: linux/arm64
     container_name: open-webui
 
     restart: unless-stopped
@@ -1105,8 +1105,8 @@ A solução desejada deve ser **Baixa**.
 14. Não altere componentes existentes sem justificar.
 15. Não altere parâmetros do Ollama sem explicar o benefício.
 16. Não utilize hardware diferente do informado.
-17. Considere sempre 8 GB de RAM.
-18. Considere sempre Apple Silicon / arm64.
+17. Considere sempre 7.7 GiB de RAM.
+18. Considere sempre Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz / x86_64.
 19. Priorize baixa latência.
 20. Priorize simplicidade.
 21. Escolha uma solução principal.
@@ -1126,7 +1126,7 @@ O objetivo não é construir a solução tecnicamente mais sofisticada.
 
 O objetivo é determinar:
 
-> **Qual é a menor arquitetura capaz de fornecer uma boa experiência de pair programming local no VSCode utilizando Ollama, considerando especificamente um MacBook Neo com Apple A18 Pro e 8 GB de RAM?**
+> **Qual é a menor arquitetura capaz de fornecer uma boa experiência de pair programming local no VSCode utilizando Ollama, considerando especificamente um Vostro 5470 com Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz e 7.7 GiB de RAM?**
 
 A resposta deve privilegiar:
 
