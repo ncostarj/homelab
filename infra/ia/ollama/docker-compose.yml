@@ -2,6 +2,8 @@ services:
 
   ollama:
     image: ollama/ollama:latest
+    ports:
+      - 11435:11434
     container_name: ollama
     init: true
 
@@ -18,10 +20,7 @@ services:
     volumes:
       - ./data/ollama:/root/.ollama
 
-    networks:
-      - proxy
-
-    cpus: 5
+    cpus: 2
     shm_size: 1g
 
     healthcheck:
@@ -39,39 +38,3 @@ services:
 
     security_opt:
       - no-new-privileges:true
-
-  webui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: open-webui
-
-    restart: unless-stopped
-
-    depends_on:
-      ollama:
-        condition: service_healthy
-
-    environment:
-      OLLAMA_BASE_URL: http://ollama:11434
-      WEBUI_URL: http://ollama.web.home
-
-    volumes:
-      - ./data/webui:/app/backend/data
-
-    networks:
-      - proxy
-
-    mem_limit: 768m
-    cpus: 1
-
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-    security_opt:
-      - no-new-privileges:true
-
-networks:
-  proxy:
-    external: true
