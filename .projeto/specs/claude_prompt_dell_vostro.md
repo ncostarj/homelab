@@ -1,6 +1,6 @@
 # Prompt Reescrito — VSCode + Ollama + LLM Local (3 Fases)
 
-> Hardware detectado automaticamente em 2026-08-16 01:23:48 via
+> Hardware detectado automaticamente em 2026-08-17 09:20:33 via
 > gerar-prompt-ollama.sh (SO identificado: Linux).
 
 Use os 3 prompts abaixo em sequência, na mesma conversa. Deixe o modelo terminar
@@ -23,7 +23,7 @@ HARDWARE (detectado automaticamente — não substituir por hardware genérico):
 | Núcleos físicos     | 2 (4 threads lógicas)       |
 | RAM                 | 7.7 GiB                                       |
 | GPU(s) detectada(s) | Intel Corporation Haswell-ULT Integrated Graphics Controller (rev 0b);NVIDIA Corporation GK208M [GeForce GT 740M] (rev a1)                                        |
-| SO / Kernel         | Linux Mint 22 / 6.8.0-136-generic                  |
+| SO / Kernel         | Linux Mint 22 / 6.8.0-137-generic                  |
 
 ```text
 Avalie explicitamente se a(s) GPU(s) acima (Intel Corporation Haswell-ULT Integrated Graphics Controller (rev 0b);NVIDIA Corporation GK208M [GeForce GT 740M] (rev a1)) são utilizáveis pelo
@@ -37,21 +37,20 @@ INFRAESTRUTURA EXISTENTE (preservar, não alterar sem necessidade):
 ../homelab
 ├── cli
 │   └── comandos
-├── docker
-│   └── mysqldumps
 ├── infra
 │   ├── automation
 │   │   └── n8n
 │   │       └── docker-compose.yml
 │   ├── databases
-│   │   ├── mongodb
 │   │   └── mysql
 │   │       └── docker-compose.yml
 │   ├── dns
 │   │   └── pihole
 │   │       └── docker-compose.yml
 │   ├── ia
-│   │   └── ollama
+│   │   ├── ollama
+│   │   │   └── docker-compose.yml
+│   │   └── webui
 │   │       └── docker-compose.yml
 │   ├── management
 │   │   └── portainer
@@ -66,7 +65,7 @@ INFRAESTRUTURA EXISTENTE (preservar, não alterar sem necessidade):
 │                   └── pihole.conf
 └── knowledge
 
-Serviços rodando: n8n, MongoDB, MySQL, Pi-hole, Ollama, Portainer, Nginx.
+Serviços rodando: n8n, MySQL, Pi-hole, Ollama, Ollama, Portainer, Nginx.
 
 RESTRIÇÕES: não recomendar Continue, Kubernetes, arquitetura distribuída, múltiplos
 serviços de IA, RAG complexo, banco vetorial, agentes externos complexos, SaaS,
@@ -124,6 +123,8 @@ Pesquise e reporte, com fonte e data para cada item:
 
   ollama:
     image: ollama/ollama:latest
+    ports:
+      - 11435:11434
     container_name: ollama
     init: true
 
@@ -140,10 +141,7 @@ Pesquise e reporte, com fonte e data para cada item:
     volumes:
       - ./data/ollama:/root/.ollama
 
-    networks:
-      - proxy
-
-    cpus: 5
+    cpus: 2
     shm_size: 1g
 
     healthcheck:
@@ -161,42 +159,6 @@ Pesquise e reporte, com fonte e data para cada item:
 
     security_opt:
       - no-new-privileges:true
-
-  webui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: open-webui
-
-    restart: unless-stopped
-
-    depends_on:
-      ollama:
-        condition: service_healthy
-
-    environment:
-      OLLAMA_BASE_URL: http://ollama:11434
-      WEBUI_URL: http://ollama.web.home
-
-    volumes:
-      - ./data/webui:/app/backend/data
-
-    networks:
-      - proxy
-
-    mem_limit: 768m
-    cpus: 1
-
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-    security_opt:
-      - no-new-privileges:true
-
-networks:
-  proxy:
-    external: true
 ```
 
 ```text
@@ -205,6 +167,87 @@ networks:
 
 Não proponha ainda a arquitetura final. Apenas diagnóstico e opções levantadas com
 fontes.
+```
+
+---
+
+## CONTEXTO E REGRAS GERAIS (repita/anexe em cada fase)
+
+```text
+HARDWARE (detectado automaticamente — não substituir por hardware genérico):
+```
+
+| Recurso            | Valor                                              |
+|---------------------|----------------------------------------------------|
+| Sistema operacional | Linux                                        |
+| Dispositivo         | Dell Inc. Vostro 5470                                    |
+| CPU                 | Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz, x86_64                              |
+| Núcleos físicos     | 2 (4 threads lógicas)       |
+| RAM                 | 7.7 GiB                                       |
+| GPU(s) detectada(s) | Intel Corporation Haswell-ULT Integrated Graphics Controller (rev 0b);NVIDIA Corporation GK208M [GeForce GT 740M] (rev a1)                                        |
+| SO / Kernel         | Linux Mint 22 / 6.8.0-137-generic                  |
+
+```text
+Avalie explicitamente se a(s) GPU(s) acima (Intel Corporation Haswell-ULT Integrated Graphics Controller (rev 0b);NVIDIA Corporation GK208M [GeForce GT 740M] (rev a1)) são utilizáveis pelo
+Ollama hoje (driver, arquitetura, suporte CUDA/ROCm/Metal atual, compatibilidade
+com a versão atual do Ollama). Não presuma aceleração útil só por existir uma GPU
+dedicada. Se o SO for WSL, avalie também se há suporte a GPU via WSL2
+(CUDA on WSL) e as limitações desse cenário.
+
+INFRAESTRUTURA EXISTENTE (preservar, não alterar sem necessidade):
+
+../homelab
+├── cli
+│   └── comandos
+├── infra
+│   ├── automation
+│   │   └── n8n
+│   │       └── docker-compose.yml
+│   ├── databases
+│   │   └── mysql
+│   │       └── docker-compose.yml
+│   ├── dns
+│   │   └── pihole
+│   │       └── docker-compose.yml
+│   ├── ia
+│   │   ├── ollama
+│   │   │   └── docker-compose.yml
+│   │   └── webui
+│   │       └── docker-compose.yml
+│   ├── management
+│   │   └── portainer
+│   │       └── docker-compose.yml
+│   └── proxy
+│       └── nginx
+│           ├── docker-compose.yml
+│           └── vhosts
+│               ├── available
+│               └── enabled
+│                   ├── financeiro.conf
+│                   └── pihole.conf
+└── knowledge
+
+Serviços rodando: n8n, MySQL, Pi-hole, Ollama, Ollama, Portainer, Nginx.
+
+RESTRIÇÕES: não recomendar Continue, Kubernetes, arquitetura distribuída, múltiplos
+serviços de IA, RAG complexo, banco vetorial, agentes externos complexos, SaaS,
+soluções enterprise, ou qualquer componente adicional sem necessidade comprovada
+para este cenário específico.
+
+PRIORIDADE: simplicidade > baixa latência > estabilidade > qualidade suficiente >
+baixo consumo de RAM/CPU. Prefira sempre o menor número de componentes que resolve
+o problema corretamente — não a solução mais sofisticada.
+
+PADRÃO DE EVIDÊNCIA: toda afirmação sobre versões, extensões, capacidades de
+Chat/Agent/Autocomplete, ou modelos deve vir com fonte e data. Se não for
+confirmável, escreva "Não confirmado" — não infira. Separe sempre: Fato /
+Inferência / Recomendação. Em caso de conflito entre fontes, priorize nesta ordem:
+documentação oficial > release notes/changelog oficial > repositório oficial no
+GitHub > outras fontes técnicas — e explique o conflito encontrado.
+
+Não atribua a um modelo (LLM) uma capacidade que na verdade pertence à interface/
+extensão/agent. Para cada capacidade de Agent, diga explicitamente quem a fornece:
+VSCode nativo / Extensão / Ollama / Modelo.
 ```
 
 ---
@@ -236,6 +279,87 @@ Entregue:
 
 Se faltar alguma informação crítica para fechar a decisão, pergunte antes de definir
 a configuração final, em vez de assumir.
+```
+
+---
+
+## CONTEXTO E REGRAS GERAIS (repita/anexe em cada fase)
+
+```text
+HARDWARE (detectado automaticamente — não substituir por hardware genérico):
+```
+
+| Recurso            | Valor                                              |
+|---------------------|----------------------------------------------------|
+| Sistema operacional | Linux                                        |
+| Dispositivo         | Dell Inc. Vostro 5470                                    |
+| CPU                 | Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz, x86_64                              |
+| Núcleos físicos     | 2 (4 threads lógicas)       |
+| RAM                 | 7.7 GiB                                       |
+| GPU(s) detectada(s) | Intel Corporation Haswell-ULT Integrated Graphics Controller (rev 0b);NVIDIA Corporation GK208M [GeForce GT 740M] (rev a1)                                        |
+| SO / Kernel         | Linux Mint 22 / 6.8.0-137-generic                  |
+
+```text
+Avalie explicitamente se a(s) GPU(s) acima (Intel Corporation Haswell-ULT Integrated Graphics Controller (rev 0b);NVIDIA Corporation GK208M [GeForce GT 740M] (rev a1)) são utilizáveis pelo
+Ollama hoje (driver, arquitetura, suporte CUDA/ROCm/Metal atual, compatibilidade
+com a versão atual do Ollama). Não presuma aceleração útil só por existir uma GPU
+dedicada. Se o SO for WSL, avalie também se há suporte a GPU via WSL2
+(CUDA on WSL) e as limitações desse cenário.
+
+INFRAESTRUTURA EXISTENTE (preservar, não alterar sem necessidade):
+
+../homelab
+├── cli
+│   └── comandos
+├── infra
+│   ├── automation
+│   │   └── n8n
+│   │       └── docker-compose.yml
+│   ├── databases
+│   │   └── mysql
+│   │       └── docker-compose.yml
+│   ├── dns
+│   │   └── pihole
+│   │       └── docker-compose.yml
+│   ├── ia
+│   │   ├── ollama
+│   │   │   └── docker-compose.yml
+│   │   └── webui
+│   │       └── docker-compose.yml
+│   ├── management
+│   │   └── portainer
+│   │       └── docker-compose.yml
+│   └── proxy
+│       └── nginx
+│           ├── docker-compose.yml
+│           └── vhosts
+│               ├── available
+│               └── enabled
+│                   ├── financeiro.conf
+│                   └── pihole.conf
+└── knowledge
+
+Serviços rodando: n8n, MySQL, Pi-hole, Ollama, Ollama, Portainer, Nginx.
+
+RESTRIÇÕES: não recomendar Continue, Kubernetes, arquitetura distribuída, múltiplos
+serviços de IA, RAG complexo, banco vetorial, agentes externos complexos, SaaS,
+soluções enterprise, ou qualquer componente adicional sem necessidade comprovada
+para este cenário específico.
+
+PRIORIDADE: simplicidade > baixa latência > estabilidade > qualidade suficiente >
+baixo consumo de RAM/CPU. Prefira sempre o menor número de componentes que resolve
+o problema corretamente — não a solução mais sofisticada.
+
+PADRÃO DE EVIDÊNCIA: toda afirmação sobre versões, extensões, capacidades de
+Chat/Agent/Autocomplete, ou modelos deve vir com fonte e data. Se não for
+confirmável, escreva "Não confirmado" — não infira. Separe sempre: Fato /
+Inferência / Recomendação. Em caso de conflito entre fontes, priorize nesta ordem:
+documentação oficial > release notes/changelog oficial > repositório oficial no
+GitHub > outras fontes técnicas — e explique o conflito encontrado.
+
+Não atribua a um modelo (LLM) uma capacidade que na verdade pertence à interface/
+extensão/agent. Para cada capacidade de Agent, diga explicitamente quem a fornece:
+VSCode nativo / Extensão / Ollama / Modelo.
 ```
 
 ---
