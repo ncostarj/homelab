@@ -1,27 +1,24 @@
 services:
-
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.32.14
     ports:
-      - 11435:11434
+      - "127.0.0.1:11435:11434"   # bind só em localhost — VSCode/Cline rodam na mesma máquina
     container_name: ollama
     init: true
-
     restart: unless-stopped
 
     environment:
-      OLLAMA_KEEP_ALIVE: 5m
+      OLLAMA_KEEP_ALIVE: 15m
       OLLAMA_MAX_LOADED_MODELS: 1
       OLLAMA_NUM_PARALLEL: 1
-      OLLAMA_NUM_THREAD: 6
+      OLLAMA_NUM_THREAD: 4        # 4 threads lógicas reais, não 6
       OLLAMA_MAX_QUEUE: 2
-      OLLAMA_CONTEXT_LENGTH: 512    
+      OLLAMA_CONTEXT_LENGTH: 4096 # era 512 — insuficiente até pra "olá" com histórico
 
     volumes:
       - ./data/ollama:/root/.ollama
 
     cpus: 2
-    shm_size: 1g
 
     healthcheck:
       test: ["CMD", "ollama", "list"]
